@@ -68,6 +68,8 @@ func toInt(value interface{}) int {
 			return int(result)
 		}
 		return 0
+	case int:
+		return int(value.(int))
 	case int8:
 		return int(value.(int8))
 	case int16:

@@ -1,7 +1,9 @@
 package Utility
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha1"
 	"encoding/binary"
@@ -13,6 +15,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,6 +29,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
 	"github.com/pborman/uuid"
 	"golang.org/x/text/encoding/charmap"
@@ -393,37 +397,277 @@ func Exists(name string) bool {
 	return true
 }
 
-// CopyFile copies a file from src to dst. If src and dst files exist, and are
-// the same, then return success. Otherise, attempt to create a hard link
-// between the two files. If that fail, copy the file contents from src to dst.
-func CopyFile(src, dst string) (err error) {
-	sfi, err := os.Stat(src)
+func CopyFile(source string, dest string) (err error) {
+	sourcefile, err := os.Open(source)
 	if err != nil {
-		return
+		return err
 	}
-	if !sfi.Mode().IsRegular() {
-		// cannot copy non-regular files (e.g., directories,
-		// symlinks, devices, etc.)
-		return fmt.Errorf("CopyFile: non-regular source file %s (%q)", sfi.Name(), sfi.Mode().String())
-	}
-	dfi, err := os.Stat(dst)
+
+	defer sourcefile.Close()
+
+	destfile, err := os.Create(dest)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return
-		}
-	} else {
-		if !(dfi.Mode().IsRegular()) {
-			return fmt.Errorf("CopyFile: non-regular destination file %s (%q)", dfi.Name(), dfi.Mode().String())
-		}
-		if os.SameFile(sfi, dfi) {
-			return
-		}
+		return err
 	}
-	if err = os.Link(src, dst); err == nil {
-		return
+
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, sourcefile)
+	if err == nil {
+		sourceinfo, err := os.Stat(source)
+		if err != nil {
+			err = os.Chmod(dest, sourceinfo.Mode())
+		}
+
 	}
-	err = copyFileContents(src, dst)
+
 	return
+}
+
+func CopyDir(source string, dest string) (err error) {
+
+	// get properties of source dir
+	sourceinfo, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+
+	// create dest dir
+
+	err = os.MkdirAll(dest, sourceinfo.Mode())
+	if err != nil {
+		return err
+	}
+
+	directory, _ := os.Open(source)
+	defer directory.Close()
+
+	objects, err := directory.Readdir(-1)
+
+	for _, obj := range objects {
+
+		sourcefilepointer := source + "/" + obj.Name()
+
+		destinationfilepointer := dest + "/" + obj.Name()
+
+		if obj.IsDir() {
+			// create sub-directories - recursively
+			err = CopyDir(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				fmt.Println(err)
+			}
+		} else {
+			// perform copy
+			err = CopyFile(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+	return
+}
+
+/**
+ * Copy the content of a directory to another directory.
+ */
+func CopyDirContent(source string, dest string) (err error) {
+
+	fileInfo, err := ioutil.ReadDir(source)
+	if err != nil {
+		log.Println("-------> ", err)
+		return err
+	}
+
+	// copy file and directory...
+	for _, file := range fileInfo {
+		if file.IsDir() {
+			log.Println("---> copy dir ", source+string(os.PathSeparator)+file.Name(), "to", dest+string(os.PathSeparator)+file.Name())
+			CopyDir(source+string(os.PathSeparator)+file.Name(), dest+string(os.PathSeparator)+file.Name())
+		} else {
+			log.Println("---> copy file ", source+string(os.PathSeparator)+file.Name(), "to", dest+string(os.PathSeparator)+file.Name())
+			CopyFile(source+string(os.PathSeparator)+file.Name(), dest+string(os.PathSeparator)+file.Name())
+		}
+	}
+	return nil
+}
+
+func MoveFile(source, destination string) (err error) {
+	src, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	fi, err := src.Stat()
+	if err != nil {
+		return err
+	}
+	flag := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	perm := fi.Mode() & os.ModePerm
+	dst, err := os.OpenFile(destination, flag, perm)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		dst.Close()
+		os.Remove(destination)
+		return err
+	}
+	err = dst.Close()
+	if err != nil {
+		return err
+	}
+	err = src.Close()
+	if err != nil {
+		return err
+	}
+	err = os.Remove(source)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CreateDirIfNotExist(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func RemoveDirContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func CreateIfNotExists(dir string, perm os.FileMode) error {
+	if Exists(dir) {
+		return nil
+	}
+
+	if err := os.MkdirAll(dir, perm); err != nil {
+		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
+	}
+
+	return nil
+}
+
+func CopySymLink(source, dest string) error {
+	link, err := os.Readlink(source)
+	if err != nil {
+		return err
+	}
+	return os.Symlink(link, dest)
+}
+
+func CompressDir(src string, buf io.Writer) error {
+	// tar > gzip > buf
+	zr := gzip.NewWriter(buf)
+	tw := tar.NewWriter(zr)
+
+	// walk through every file in the folder
+	filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+		// generate tar header
+		header, err := tar.FileInfoHeader(fi, file)
+		if err != nil {
+			return err
+		}
+
+		// must provide real name
+		// (see https://golang.org/src/archive/tar/common.go?#L626)
+		header.Name = filepath.ToSlash(file)
+
+		// write header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		// if not a dir, write file content
+		if !fi.IsDir() {
+			data, err := os.Open(file)
+			defer data.Close()
+
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(tw, data); err != nil {
+				return err
+			}
+
+		}
+		return nil
+	})
+
+	// produce tar
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	// produce gzip
+	if err := zr.Close(); err != nil {
+		return err
+	}
+	//
+	return nil
+}
+
+func ExtractTarGz(gzipStream io.Reader) {
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		log.Fatal("ExtractTarGz: NewReader failed")
+	}
+
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatalf("ExtractTarGz: Next() failed: %s", err.Error())
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(header.Name, 0755); err != nil {
+				log.Fatalf("ExtractTarGz: Mkdir() failed: %s", err.Error())
+			}
+		case tar.TypeReg:
+			outFile, err := os.Create(header.Name)
+			if err != nil {
+				log.Fatalf("ExtractTarGz: Create() failed: %s", err.Error())
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+			}
+			outFile.Close()
+
+		default:
+			log.Fatalf(
+				"ExtractTarGz: uknown type: %s in %s",
+				header.Typeflag,
+				header.Name)
+		}
+	}
 }
 
 // copyFileContents copies the contents of the file named src to the file named
@@ -469,6 +713,11 @@ func FunctionName() string {
 	runtime.Callers(2, pc)
 	f := runtime.FuncForPC(pc[0])
 	return f.Name()
+}
+
+func JsonErrorStr(functionName string, fileLine string, err error) string {
+	str, _ := ToJson(map[string]string{"FunctionName": functionName, "FileLine": fileLine, "ErrorMsg": err.Error()})
+	return str
 }
 
 /**
@@ -527,9 +776,43 @@ type IPInfo struct {
 	Postal string
 }
 
-// MyIP provides information about the public IP address of the client.
-func MyIP() (*IPInfo, error) {
-	return ForeignIP("")
+func validIP4(ipAddress string) bool {
+	ipAddress = strings.Trim(ipAddress, " ")
+
+	re, _ := regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+	if re.MatchString(ipAddress) {
+		return true
+	}
+	return false
+}
+
+func MyIP() string {
+
+	consensus := externalip.DefaultConsensus(nil, nil)
+	// Get your IP,
+	// which is never <nil> when err is <nil>.
+	ip, err := consensus.ExternalIP()
+	if err == nil {
+		return ip.String() // print IPv4/IPv6 in string format
+	}
+	return ""
+}
+
+func MyLocalIP() string {
+	// GetLocalIP returns the non loopback local IP of the host
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
 
 // ForeignIP provides information about the given IP address,
@@ -1075,6 +1358,20 @@ func ToInt(value interface{}) int {
 	return val
 }
 
+func IsBool(value interface{}) bool {
+	if reflect.TypeOf(value).Kind() == reflect.Bool {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.String {
+		_, err := strconv.ParseBool(value.(string))
+		if err != nil {
+			return false
+		} else {
+			return true
+		}
+	}
+	return false
+}
+
 func ToBool(value interface{}) bool {
 	if reflect.TypeOf(value).Kind() == reflect.Bool {
 		return value.(bool)
@@ -1088,6 +1385,50 @@ func ToBool(value interface{}) bool {
 	}
 	return false
 }
+
+func IsNumeric(value interface{}) bool {
+
+	if reflect.TypeOf(value).Kind() == reflect.String {
+		return false
+	} else if reflect.TypeOf(value).Kind() == reflect.Int {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Int8 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Int16 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Int32 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Int64 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Float32 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Float64 {
+		return true
+	} else if reflect.TypeOf(value).Kind() == reflect.Bool {
+		return false
+	} else if reflect.TypeOf(value).String() == "time.Time" {
+		return true
+	}
+
+	return false
+}
+
+func IsCreditCardNumber(number string) bool {
+	Re := regexp.MustCompile(`^(?:4[0-9]{12}(?:[0-9]{3})?|[25][1-7][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\d{3})\d{11})$`)
+	return Re.MatchString(number)
+}
+
+func IsPhoneNumber(number string) bool {
+	Re := regexp.MustCompile(`^(?:(?:\(?(?:00|\+)([1-4]\d\d|[1-9]\d?)\)?)?[\-\.\ \\\/]?)?((?:\(?\d{1,}\)?[\-\.\ \\\/]?){0,})(?:[\-\.\ \\\/]?(?:#|ext\.?|extension|x)[\-\.\ \\\/]?(\d+))?$`)
+	return Re.MatchString(number)
+}
+
+func IsEmail(email string) bool {
+	Re := regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+	return Re.MatchString(email)
+}
+
 func ToNumeric(value interface{}) float64 {
 	var val float64
 	if reflect.TypeOf(value).Kind() == reflect.String {
@@ -1112,6 +1453,8 @@ func ToNumeric(value interface{}) float64 {
 		} else {
 			val = 0.0
 		}
+	} else if reflect.TypeOf(value).String() == "time.Time" {
+		return float64(value.(time.Time).Unix()) // return the unix timestamp.
 	} else {
 		log.Panicln("Value with type:", reflect.TypeOf(value).String(), "cannot be convert to numerical value")
 	}
@@ -1161,6 +1504,26 @@ func Less(val0 interface{}, val1 interface{}) bool {
 		log.Println("Value with type:", reflect.TypeOf(val0).String(), "cannot be compare!")
 	}
 	return false
+}
+
+/**
+ * Get the mime type of a file.
+ */
+func GetFileContentType(out *os.File) (string, error) {
+
+	// Only the first 512 bytes are used to sniff the content type.
+	buffer := make([]byte, 512)
+
+	_, err := out.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	// Use the net/http package's handy DectectContentType function. Always returns a valid
+	// content-type by returning "application/octet-stream" if no others seemed to match.
+	contentType := http.DetectContentType(buffer)
+
+	return contentType, nil
 }
 
 /**
@@ -1236,4 +1599,21 @@ func RemoveContents(dir string) error {
 		}
 	}
 	return nil
+}
+
+func GetExecName(path string) string {
+	var startIndex, endIndex int
+
+	startIndex = strings.LastIndex(path, string(os.PathSeparator))
+	if startIndex > -1 {
+		path = path[startIndex+1:]
+	}
+
+	endIndex = strings.LastIndex(path, ".")
+
+	if endIndex > -1 && startIndex > -1 {
+		path = path[:endIndex]
+	}
+
+	return path
 }
