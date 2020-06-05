@@ -29,6 +29,8 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/mitchellh/go-ps"
+
 	"github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
 	"github.com/pborman/uuid"
@@ -134,6 +136,57 @@ func ToJson(obj interface{}) (string, error) {
 ////////////////////////////////////////////////////////////////////////////////
 //              			Utility function...
 ////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Get the list of process id by it name.
+ */
+func GetProcessIdsByName(name string) ([]int, error) {
+	processList, err := ps.Processes()
+	if err != nil {
+		return nil, errors.New("ps.Processes() Failed, are you using windows?")
+	}
+
+	pids := make([]int, 0)
+
+	// map ages
+	for x := range processList {
+		var process ps.Process
+		process = processList[x]
+		if strings.HasPrefix(process.Executable(), name) {
+			pids = append(pids, process.Pid())
+		}
+	}
+
+	return pids, nil
+}
+
+/**
+ * Kill a process with a given name.
+ */
+func KillProcessByName(name string) error {
+	pids, err := GetProcessIdsByName(name)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(pids); i++ {
+		proc, err := os.FindProcess(pids[i])
+
+		if err != nil {
+			log.Println(err)
+		}
+		log.Println("Kill ", name, " pid ", pids[i])
+		// Kill the process
+		if proc != nil {
+			if !strings.HasPrefix(name, "Globular") {
+				proc.Kill()
+			}
+		}
+	}
+
+	return nil
+}
+
 func MakeTimestamp() int64 {
 	return time.Now().Unix()
 }
@@ -578,7 +631,7 @@ func CopySymLink(source, dest string) error {
 	return os.Symlink(link, dest)
 }
 
-func CompressDir(src string, buf io.Writer) error {
+func CompressDir(root string, src string, buf io.Writer) error {
 	// tar > gzip > buf
 	zr := gzip.NewWriter(buf)
 	tw := tar.NewWriter(zr)
@@ -591,9 +644,17 @@ func CompressDir(src string, buf io.Writer) error {
 			return err
 		}
 
-		// must provide real name
 		// (see https://golang.org/src/archive/tar/common.go?#L626)
-		header.Name = filepath.ToSlash(file)
+		if len(root) > 0 {
+			path := file[len(root)+1:]
+			if len(path) == 0 {
+				return nil
+			}
+			header.Name = filepath.ToSlash(path)
+
+		} else {
+			header.Name = filepath.ToSlash(file)
+		}
 
 		// write header
 		if err := tw.WriteHeader(header); err != nil {
@@ -610,8 +671,8 @@ func CompressDir(src string, buf io.Writer) error {
 			if _, err := io.Copy(tw, data); err != nil {
 				return err
 			}
-
 		}
+
 		return nil
 	})
 
@@ -670,6 +731,17 @@ func ExtractTarGz(gzipStream io.Reader) {
 	}
 }
 
+func FindFileByName(path string, name string) ([]string, error) {
+	files := make([]string, 0)
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err == nil && strings.HasSuffix(info.Name(), name) {
+			files = append(files, path)
+		}
+		return err
+	})
+	return files, err
+}
+
 // copyFileContents copies the contents of the file named src to the file named
 // by dst. The file will be created if it does not already exist. If the
 // destination file exists, all it's contents will be replaced by the contents
@@ -716,8 +788,8 @@ func FunctionName() string {
 }
 
 func JsonErrorStr(functionName string, fileLine string, err error) string {
-	str, _ := ToJson(map[string]string{"FunctionName": functionName, "FileLine": fileLine, "ErrorMsg": err.Error()})
-	return str
+	str, _ := json.Marshal(map[string]string{"FunctionName": functionName, "FileLine": fileLine, "ErrorMsg": err.Error()})
+	return string(str)
 }
 
 /**
@@ -786,6 +858,23 @@ func validIP4(ipAddress string) bool {
 	return false
 }
 
+// getMacAddr gets the MAC hardware
+// address of the host machine
+func MyMacAddr() (addr string) {
+	interfaces, err := net.Interfaces()
+	if err == nil {
+		for _, i := range interfaces {
+			if i.Flags&net.FlagUp != 0 && bytes.Compare(i.HardwareAddr, nil) != 0 {
+				// Don't use random as we have a real address
+				addr = i.HardwareAddr.String()
+				break
+			}
+		}
+	}
+	return
+}
+
+// Return the external ip.
 func MyIP() string {
 
 	consensus := externalip.DefaultConsensus(nil, nil)
@@ -798,6 +887,7 @@ func MyIP() string {
 	return ""
 }
 
+// Return the local ip.
 func MyLocalIP() string {
 	// GetLocalIP returns the non loopback local IP of the host
 	addrs, err := net.InterfaceAddrs()
@@ -813,6 +903,19 @@ func MyLocalIP() string {
 		}
 	}
 	return ""
+}
+
+// Return true if the address can be considere a local address. That can
+// be use to determine if the domain is localhost for exemple.
+func IsLocal(address string) bool {
+	ips, _ := net.LookupIP(address)
+	for i := 0; i < len(ips); i++ {
+		// TODO find a way to test local address if the server is in the same local network...
+		if address == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" {
+			return true
+		}
+	}
+	return false
 }
 
 // ForeignIP provides information about the given IP address,
