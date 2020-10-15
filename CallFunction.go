@@ -22,7 +22,9 @@ func GetFunction(name string) interface{} {
 }
 
 func CallFunction(name string, params ...interface{}) (result []reflect.Value, err error) {
-
+	if getTypeManager().getFunction(name) == nil {
+		return nil, errors.New("no function was register with name " + name)
+	}
 	f := reflect.ValueOf(getTypeManager().getFunction(name))
 	if len(params) != f.Type().NumIn() && !f.Type().IsVariadic() {
 		err = errors.New("Wrong number of parameter for " + name + " got " + strconv.Itoa(len(params)) + " but espect " + strconv.Itoa(f.Type().NumIn()))
