@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -168,7 +169,6 @@ func KillProcessByName(name string) error {
 	if err != nil {
 		return err
 	}
-
 	for i := 0; i < len(pids); i++ {
 		proc, err := os.FindProcess(pids[i])
 
@@ -179,7 +179,10 @@ func KillProcessByName(name string) error {
 		// Kill the process
 		if proc != nil {
 			if !strings.HasPrefix(name, "Globular") {
-				proc.Kill()
+				err = proc.Kill()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -1719,4 +1722,24 @@ func GetExecName(path string) string {
 	}
 
 	return path
+}
+
+/** Open the browser at given url **/
+func OpenBrowser(url string) {
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
