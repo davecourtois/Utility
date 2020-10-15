@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 	"unsafe"
@@ -184,6 +185,36 @@ func KillProcessByName(name string) error {
 					return err
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+func TerminateProcess(pid int) error {
+	//log.Println("close process call with id: ", pid)
+	if runtime.GOOS == "windows" {
+		d, e := syscall.LoadDLL("kernel32.dll")
+		if e != nil {
+			return e
+		}
+		p, e := d.FindProc("GenerateConsoleCtrlEvent")
+		if e != nil {
+			return e
+		}
+		r, _, e := p.Call(syscall.CTRL_BREAK_EVENT, uintptr(pid))
+		if r == 0 {
+			return e
+
+		}
+	} else {
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			return err
+		}
+		err = p.Signal(os.Interrupt)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -912,9 +943,10 @@ func MyLocalIP() string {
 // be use to determine if the domain is localhost for exemple.
 func IsLocal(address string) bool {
 	ips, _ := net.LookupIP(address)
+	host, _ := os.Hostname()
 	for i := 0; i < len(ips); i++ {
 		// TODO find a way to test local address if the server is in the same local network...
-		if address == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" {
+		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.ToUpper(host) == strings.ToUpper(address) {
 			return true
 		}
 	}
