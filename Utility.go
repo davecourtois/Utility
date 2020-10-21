@@ -188,34 +188,16 @@ func KillProcessByName(name string) error {
 	return nil
 }
 
-func TerminateProcess(pid int) error {
-	//log.Println("close process call with id: ", pid)
-	if runtime.GOOS == "windows" {
-		d, e := syscall.LoadDLL("kernel32.dll")
-		if e != nil {
-			return e
-		}
-		p, e := d.FindProc("GenerateConsoleCtrlEvent")
-		if e != nil {
-			return e
-		}
-		r, _, e := p.Call(syscall.CTRL_BREAK_EVENT, uintptr(pid))
-		if r == 0 {
-			return e
+func TerminateProcess(pid int, exitcode int) error {
 
-		}
-	} else {
-		p, err := os.FindProcess(pid)
-		if err != nil {
-			return err
-		}
-		err = p.Signal(os.Interrupt)
-		if err != nil {
-			return err
-		}
+	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
+	if e != nil {
+		return e
 	}
+	defer syscall.CloseHandle(h)
 
-	return nil
+	e = syscall.TerminateProcess(h, uint32(exitcode))
+	return e
 }
 
 func MakeTimestamp() int64 {
