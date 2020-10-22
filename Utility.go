@@ -26,7 +26,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
+
+	//	"syscall"
 	"time"
 	"unicode"
 	"unsafe"
@@ -193,14 +194,26 @@ func KillProcessByName(name string) error {
 
 func TerminateProcess(pid int, exitcode int) error {
 
-	h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
-	if e != nil {
-		return e
-	}
-	defer syscall.CloseHandle(h)
+	if runtime.GOOS == "windows" {
+		/*
+			h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
+			if e != nil {
+				return e
+			}
+			defer syscall.CloseHandle(h)
 
-	e = syscall.TerminateProcess(h, uint32(exitcode))
-	return e
+			e = syscall.TerminateProcess(h, uint32(exitcode))*/
+		var e error
+		return e
+	} else {
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			return err
+		}
+
+		return p.Signal(os.Interrupt)
+
+	}
 }
 
 func MakeTimestamp() int64 {
@@ -888,6 +901,23 @@ func MyMacAddr() (addr string) {
 		}
 	}
 	return
+}
+
+func DomainHasIp(domain string, ip string) bool {
+	// I will wait until the same ip is return from the dns lookup.
+	ips, err := net.LookupIP(domain)
+	if err != nil {
+		return false
+	}
+
+	for i := 0; i < len(ips); i++ {
+		ip_ := ips[i]
+		if ip_.String() == ip {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Return the external ip.
