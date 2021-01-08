@@ -69,6 +69,69 @@ var (
 	logFct     func()
 )
 
+///// Note uncomment to compile on windows...
+
+func SetEnvironmentVariable(key string, value string) error {
+	if runtime.GOOS != "windows" {
+
+		return os.Setenv(key, value)
+
+	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
+
+		err = k.SetStringValue(key, value)
+		if err != nil {
+			return err
+		}
+	*/
+	return nil
+}
+
+func GetEnvironmentVariable(key string) (string, error) {
+	if runtime.GOOS != "windows" {
+		return os.Getenv(key), nil
+	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return "", err
+		}
+		defer k.Close()
+		var value string
+		value, err = k.GetStringValue(key)
+		if err != nil {
+			return value, err
+		}
+		return value, nil
+	*/
+	return "", nil
+}
+
+func UnsetEnvironmentVariable(key string) error {
+
+	if runtime.GOOS != "windows" {
+		return os.Unsetenv(key)
+	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
+
+		err = k.DeleteValue(key)
+		if err != nil {
+			return err
+		}
+	*/
+	return nil
+}
+
 func Log(infos ...interface{}) {
 
 	// if the channel is nil that's mean no processing function is running,
@@ -717,47 +780,49 @@ func CompressDir(root string, src string, buf io.Writer) error {
 	return nil
 }
 
-func ExtractTarGz(gzipStream io.Reader) {
+func ExtractTarGz(gzipStream io.Reader) (string, error) {
 	uncompressedStream, err := gzip.NewReader(gzipStream)
 	if err != nil {
-		log.Fatal("ExtractTarGz: NewReader failed")
+		return "", errors.New("ExtractTarGz: NewReader failed")
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)
-
+	var name string
 	for true {
 		header, err := tarReader.Next()
 
 		if err == io.EOF {
-			break
+			return "", err
 		}
 
 		if err != nil {
-			log.Fatalf("ExtractTarGz: Next() failed: %s", err.Error())
+			return "", errors.New("ExtractTarGz: Next() failed: " + err.Error())
 		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
+			name = header.Name
 			if err := os.Mkdir(header.Name, 0755); err != nil {
-				log.Fatalf("ExtractTarGz: Mkdir() failed: %s", err.Error())
+				return "", errors.New("ExtractTarGz: Mkdir() failed: " + err.Error())
 			}
 		case tar.TypeReg:
+			name = header.Name
 			outFile, err := os.Create(header.Name)
 			if err != nil {
-				log.Fatalf("ExtractTarGz: Create() failed: %s", err.Error())
+				return "", errors.New("ExtractTarGz: Create() failed: " + err.Error())
 			}
 			if _, err := io.Copy(outFile, tarReader); err != nil {
-				log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+				return "", errors.New("ExtractTarGz: Copy() failed: " + err.Error())
 			}
 			outFile.Close()
 
 		default:
-			log.Fatalf(
-				"ExtractTarGz: uknown type: %s in %s",
-				header.Typeflag,
-				header.Name)
+
+			return "", errors.New("ExtractTarGz: uknown type: " + ToString(header.Typeflag) + " in " + header.Name)
 		}
 	}
+
+	return name, nil
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
