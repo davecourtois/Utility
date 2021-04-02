@@ -1,9 +1,7 @@
 package Utility
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha1"
 	"encoding/binary"
@@ -36,6 +34,7 @@ import (
 	"github.com/kalafut/imohash"
 	"github.com/mitchellh/go-ps"
 	"github.com/pborman/uuid"
+
 	"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
@@ -77,18 +76,18 @@ func SetEnvironmentVariable(key string, value string) error {
 		return os.Setenv(key, value)
 
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
 
-		err = k.SetStringValue(key, value)
-		if err != nil {
-			return err
-		}
-	*/
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.SetStringValue(key, value)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -96,20 +95,20 @@ func GetEnvironmentVariable(key string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return os.Getenv(key), nil
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return "", err
-		}
-		defer k.Close()
-		var value string
-		value, err = k.GetStringValue(key)
-		if err != nil {
-			return value, err
-		}
-		return value, nil
-	*/
-	return "", nil
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+	var value string
+	value, _, err = k.GetStringValue(key)
+	if err != nil {
+		return value, err
+	}
+	return value, nil
+
+	//return "", nil
 }
 
 func UnsetEnvironmentVariable(key string) error {
@@ -117,18 +116,18 @@ func UnsetEnvironmentVariable(key string) error {
 	if runtime.GOOS != "windows" {
 		return os.Unsetenv(key)
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
 
-		err = k.DeleteValue(key)
-		if err != nil {
-			return err
-		}
-	*/
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.DeleteValue(key)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -561,6 +560,7 @@ func CopyFile(source string, dest string) (err error) {
 	if err == nil {
 		sourceinfo, err := os.Stat(source)
 		if err != nil {
+
 			err = os.Chmod(dest, sourceinfo.Mode())
 		}
 
@@ -569,71 +569,47 @@ func CopyFile(source string, dest string) (err error) {
 	return
 }
 
+/**
+ * I made use of cp instead of go here...
+ * Be sure the command exist in the computer who run that command.
+ */
 func CopyDir(source string, dest string) (err error) {
+	// First I will create the directory
+	CreateDirIfNotExist(dest)
 
-	// get properties of source dir
-	sourceinfo, err := os.Stat(source)
+	// call a recursive copy
+	cmd := exec.Command("cp", "-R", source, dest)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	if err != nil {
-		return err
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return
 	}
-
-	// create dest dir
-
-	err = os.MkdirAll(dest, sourceinfo.Mode())
-	if err != nil {
-		return err
-	}
-
-	directory, _ := os.Open(source)
-	defer directory.Close()
-
-	objects, err := directory.Readdir(-1)
-
-	for _, obj := range objects {
-
-		sourcefilepointer := source + "/" + obj.Name()
-
-		destinationfilepointer := dest + "/" + obj.Name()
-
-		if obj.IsDir() {
-			// create sub-directories - recursively
-			err = CopyDir(sourcefilepointer, destinationfilepointer)
-			if err != nil {
-				fmt.Println(err)
-			}
-		} else {
-			// perform copy
-			err = CopyFile(sourcefilepointer, destinationfilepointer)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	}
-	return
+	fmt.Println("Result: " + out.String())
+	return nil
 }
 
-/**
- * Copy the content of a directory to another directory.
- */
-func CopyDirContent(source string, dest string) (err error) {
+func CreateIfNotExists(dir string, perm os.FileMode) error {
+	if Exists(dir) {
+		return nil
+	}
 
-	fileInfo, err := ioutil.ReadDir(source)
+	if err := os.MkdirAll(dir, perm); err != nil {
+		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
+	}
+
+	return nil
+}
+
+func CopySymLink(source, dest string) error {
+	link, err := os.Readlink(source)
 	if err != nil {
-		log.Println("-------> ", err)
 		return err
 	}
-
-	// copy file and directory...
-	for _, file := range fileInfo {
-		if file.IsDir() {
-			log.Println("---> copy dir ", source+string(os.PathSeparator)+file.Name(), "to", dest+string(os.PathSeparator)+file.Name())
-			CopyDir(source+string(os.PathSeparator)+file.Name(), dest+string(os.PathSeparator)+file.Name())
-		} else {
-			log.Println("---> copy file ", source+string(os.PathSeparator)+file.Name(), "to", dest+string(os.PathSeparator)+file.Name())
-			CopyFile(source+string(os.PathSeparator)+file.Name(), dest+string(os.PathSeparator)+file.Name())
-		}
-	}
-	return nil
+	return os.Symlink(link, dest)
 }
 
 func MoveFile(source, destination string) (err error) {
@@ -703,132 +679,86 @@ func RemoveDirContents(dir string) error {
 	return nil
 }
 
-func CreateIfNotExists(dir string, perm os.FileMode) error {
-	if Exists(dir) {
-		return nil
-	}
-
-	if err := os.MkdirAll(dir, perm); err != nil {
-		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
-	}
-
-	return nil
-}
-
-func CopySymLink(source, dest string) error {
-	link, err := os.Readlink(source)
-	if err != nil {
-		return err
-	}
-	return os.Symlink(link, dest)
-}
-
+/**
+ * Here I will made use of tar to compress the file.
+ */
 func CompressDir(root string, src string, buf io.Writer) error {
-	// tar > gzip > buf
-	zr := gzip.NewWriter(buf)
-	tw := tar.NewWriter(zr)
+	// First I will create the directory
+	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
+	defer os.Remove(tmp)
 
-	// walk through every file in the folder
-	filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
-		// generate tar header
-		header, err := tar.FileInfoHeader(fi, file)
-		if err != nil {
-			return err
-		}
+	// Compress the directory
+	cmd := exec.Command("tar", "-czvf", tmp, "-C", src, ".")
+	cmd.Dir = os.TempDir()
 
-		// (see https://golang.org/src/archive/tar/common.go?#L626)
-		if len(root) > 0 {
-			path := file[len(root)+1:]
-			if len(path) == 0 {
-				return nil
-			}
-			header.Name = filepath.ToSlash(path)
-
-		} else {
-			header.Name = filepath.ToSlash(file)
-		}
-
-		// write header
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		// if not a dir, write file content
-		if !fi.IsDir() {
-			data, err := os.Open(file)
-			defer data.Close()
-
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(tw, data); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	// produce tar
-	if err := tw.Close(); err != nil {
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return err
 	}
-	// produce gzip
-	if err := zr.Close(); err != nil {
+
+	data, err := ioutil.ReadFile(tmp)
+	if err != nil {
 		return err
 	}
-	//
+
+	buf.Write(data)
+
 	return nil
 }
 
-func ExtractTarGz(gzipStream io.Reader) (string, error) {
-	uncompressedStream, err := gzip.NewReader(gzipStream)
+/**
+ * Extract a tar gz file and return the path where the data is...
+ */
+func ExtractTarGz(r io.Reader) (string, error) {
+	// First I will create the directory
+	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
+	defer os.Remove(tmp)
+
+	// Now the buffer contain the .tgz data
+	buf, err := ioutil.ReadAll(r)
 	if err != nil {
-		return "", errors.New("ExtractTarGz: NewReader failed")
+		return "", err
 	}
 
-	tarReader := tar.NewReader(uncompressedStream)
-	var name string
-	for true {
-		header, err := tarReader.Next()
-
-		if err == io.EOF {
-			return "", err
-		}
-
-		if err != nil {
-			return "", errors.New("ExtractTarGz: Next() failed: " + err.Error())
-		}
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			name = header.Name
-			if err := os.Mkdir(header.Name, 0755); err != nil {
-				return "", errors.New("ExtractTarGz: Mkdir() failed: " + err.Error())
-			}
-		case tar.TypeReg:
-			name = header.Name
-			outFile, err := os.Create(header.Name)
-			if err != nil {
-				return "", errors.New("ExtractTarGz: Create() failed: " + err.Error())
-			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				return "", errors.New("ExtractTarGz: Copy() failed: " + err.Error())
-			}
-			outFile.Close()
-
-		default:
-
-			return "", errors.New("ExtractTarGz: uknown type: " + ToString(header.Typeflag) + " in " + header.Name)
-		}
+	// Here I will write the data into a tgz file...
+	err = ioutil.WriteFile(tmp, buf, 0777)
+	if err != nil {
+		return "", err
 	}
 
-	return name, nil
+	// Untar into the output dir and return it path.
+	output := os.TempDir() + "/" + RandomUUID()
+	CreateDirIfNotExist(output)
+
+	cmd := exec.Command("tar", "-xvzf", tmp, "-C", output)
+	cmd.Dir = os.TempDir()
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return "", err
+	}
+
+	return output, nil
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
 	files := make([]string, 0)
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err == nil && strings.HasSuffix(info.Name(), name) {
+		if strings.HasPrefix(name, ".") {
+			if err == nil && strings.HasSuffix(info.Name(), name) {
+				files = append(files, path)
+			}
+		} else if err == nil && info.Name() == name {
 			files = append(files, path)
 		}
 		return err
@@ -881,8 +811,8 @@ func FunctionName() string {
 	return f.Name()
 }
 
-func JsonErrorStr(errorName string, functionName string, fileLine string, err error) string {
-	str, _ := json.Marshal(map[string]string{"ErrorName": errorName, "FunctionName": functionName, "FileLine": fileLine, "ErrorMsg": err.Error()})
+func JsonErrorStr(functionName string, fileLine string, err error) string {
+	str, _ := json.Marshal(map[string]string{"FunctionName": functionName, "FileLine": fileLine, "ErrorMsg": err.Error()})
 	return string(str)
 }
 
@@ -1000,6 +930,7 @@ func MyIP() string {
 
 // Return the local ip.
 func MyLocalIP() string {
+
 	// GetLocalIP returns the non loopback local IP of the host
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -1024,9 +955,11 @@ func IsLocal(address string) bool {
 	for i := 0; i < len(ips); i++ {
 		// TODO find a way to test local address if the server is in the same local network...
 		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.ToUpper(host) == strings.ToUpper(address) {
+			log.Println(address, " is local")
 			return true
 		}
 	}
+	log.Println(address, " is not local")
 	return false
 }
 
