@@ -692,10 +692,7 @@ func RemoveDirContents(dir string) error {
  * Here I will made use of tar to compress the file.
  */
 func CompressDir(src string, buf io.Writer) error {
-<<<<<<< HEAD
 
-=======
->>>>>>> 8b8d0d5ffb25ec7c4aa54bde478c466efd2819e0
 	// First I will create the directory
 	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
 
@@ -748,15 +745,11 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	prevDir, _ := os.Getwd()
 	os.Chdir(os.TempDir())
 	defer os.Chdir(prevDir)
+
 	// Untar into the output dir and return it path.
-<<<<<<< HEAD
 	output := RandomUUID()
 	CreateDirIfNotExist(os.TempDir() + "/" + output)
-=======
-	output := os.TempDir() + "/" + RandomUUID()
-	CreateDirIfNotExist(output)
 
->>>>>>> 8b8d0d5ffb25ec7c4aa54bde478c466efd2819e0
 	cmd := exec.Command("tar", "-xvzf", tmp, "-C", output, "--strip-components", "1")
 	cmd.Dir = os.TempDir()
 	log.Println("extract file: tar -xvzf ", tmp)
