@@ -35,7 +35,7 @@ import (
 	"github.com/mitchellh/go-ps"
 	"github.com/pborman/uuid"
 
-	"golang.org/x/sys/windows/registry"
+	/*"golang.org/x/sys/windows/registry"*/
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -76,18 +76,18 @@ func SetEnvironmentVariable(key string, value string) error {
 		return os.Setenv(key, value)
 
 	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-
-	err = k.SetStringValue(key, value)
-	if err != nil {
-		return err
-	}
-
+		err = k.SetStringValue(key, value)
+		if err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -104,20 +104,20 @@ func GetEnvironmentVariable(key string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return os.Getenv(key), nil
 	}
-
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return "", err
-	}
-	defer k.Close()
-	var value string
-	value, _, err = k.GetStringValue(key)
-	if err != nil {
-		return value, err
-	}
-	return value, nil
-
-	//return "", nil
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return "", err
+		}
+		defer k.Close()
+		var value string
+		value, _, err = k.GetStringValue(key)
+		if err != nil {
+			return value, err
+		}
+		return value, nil
+	*/
+	return "", nil
 }
 
 func UnsetEnvironmentVariable(key string) error {
@@ -125,18 +125,18 @@ func UnsetEnvironmentVariable(key string) error {
 	if runtime.GOOS != "windows" {
 		return os.Unsetenv(key)
 	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-
-	err = k.DeleteValue(key)
-	if err != nil {
-		return err
-	}
-
+		err = k.DeleteValue(key)
+		if err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -692,7 +692,10 @@ func RemoveDirContents(dir string) error {
  * Here I will made use of tar to compress the file.
  */
 func CompressDir(src string, buf io.Writer) error {
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8b8d0d5ffb25ec7c4aa54bde478c466efd2819e0
 	// First I will create the directory
 	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
 
@@ -746,8 +749,14 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	os.Chdir(os.TempDir())
 	defer os.Chdir(prevDir)
 	// Untar into the output dir and return it path.
+<<<<<<< HEAD
 	output := RandomUUID()
 	CreateDirIfNotExist(os.TempDir() + "/" + output)
+=======
+	output := os.TempDir() + "/" + RandomUUID()
+	CreateDirIfNotExist(output)
+
+>>>>>>> 8b8d0d5ffb25ec7c4aa54bde478c466efd2819e0
 	cmd := exec.Command("tar", "-xvzf", tmp, "-C", output, "--strip-components", "1")
 	cmd.Dir = os.TempDir()
 	log.Println("extract file: tar -xvzf ", tmp)
