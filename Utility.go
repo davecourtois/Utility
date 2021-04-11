@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	//	"syscall"
+	//"syscall"
 	"time"
 	"unicode"
 	"unsafe"
@@ -89,6 +89,15 @@ func SetEnvironmentVariable(key string, value string) error {
 		}
 	*/
 	return nil
+}
+
+func RemoveString(s []string, r string) []string {
+	for i, v := range s {
+		if v == r {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }
 
 func GetEnvironmentVariable(key string) (string, error) {
@@ -692,8 +701,10 @@ func RemoveString(s []string, r string) []string {
  * Here I will made use of tar to compress the file.
  */
 func CompressDir(src string, buf io.Writer) error {
+
 	// First I will create the directory
 	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
+
 	defer os.Remove(tmp)
 
 	// Compress the directory
@@ -724,9 +735,10 @@ func CompressDir(src string, buf io.Writer) error {
  * Extract a tar gz file and return the path where the data is...
  */
 func ExtractTarGz(r io.Reader) (string, error) {
+
 	// First I will create the directory
-	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
-	defer os.Remove(tmp)
+	tmp := RandomUUID() + ".tgz"
+	//defer os.Remove(tmp)
 
 	// Now the buffer contain the .tgz data
 	buf, err := ioutil.ReadAll(r)
@@ -735,18 +747,21 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	}
 
 	// Here I will write the data into a tgz file...
-	err = ioutil.WriteFile(tmp, buf, 0777)
+	err = ioutil.WriteFile(os.TempDir()+"/"+tmp, buf, 0777)
 	if err != nil {
 		return "", err
 	}
+	prevDir, _ := os.Getwd()
+	os.Chdir(os.TempDir())
+	defer os.Chdir(prevDir)
 
 	// Untar into the output dir and return it path.
-	output := os.TempDir() + "/" + RandomUUID()
-	CreateDirIfNotExist(output)
+	output := RandomUUID()
+	CreateDirIfNotExist(os.TempDir() + "/" + output)
 
 	cmd := exec.Command("tar", "-xvzf", tmp, "-C", output, "--strip-components", "1")
 	cmd.Dir = os.TempDir()
-
+	log.Println("extract file: tar -xvzf ", tmp)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -757,7 +772,7 @@ func ExtractTarGz(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	return output, nil
+	return os.TempDir() + "/" + output, nil
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
