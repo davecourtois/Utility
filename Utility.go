@@ -30,12 +30,16 @@ import (
 	"unicode"
 	"unsafe"
 
+	"image"
+	"image/png"
+
 	"github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
 	"github.com/mitchellh/go-ps"
 	"github.com/pborman/uuid"
-
-	/*"golang.org/x/sys/windows/registry"*/
+	"github.com/srwiley/oksvg"
+	"github.com/srwiley/rasterx"
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -76,18 +80,18 @@ func SetEnvironmentVariable(key string, value string) error {
 		return os.Setenv(key, value)
 
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
 
-		err = k.SetStringValue(key, value)
-		if err != nil {
-			return err
-		}
-	*/
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.SetStringValue(key, value)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -95,20 +99,20 @@ func GetEnvironmentVariable(key string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return os.Getenv(key), nil
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return "", err
-		}
-		defer k.Close()
-		var value string
-		value, _, err = k.GetStringValue(key)
-		if err != nil {
-			return value, err
-		}
-		return value, nil
-	*/
-	return "", nil
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+	var value string
+	value, _, err = k.GetStringValue(key)
+	if err != nil {
+		return value, err
+	}
+	return value, nil
+
+	//return "", nil
 }
 
 func UnsetEnvironmentVariable(key string) error {
@@ -116,18 +120,18 @@ func UnsetEnvironmentVariable(key string) error {
 	if runtime.GOOS != "windows" {
 		return os.Unsetenv(key)
 	}
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
 
-		err = k.DeleteValue(key)
-		if err != nil {
-			return err
-		}
-	*/
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.DeleteValue(key)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1811,4 +1815,31 @@ func OpenBrowser(url string) {
 		log.Fatal(err)
 	}
 
+}
+
+func SvgToPng(input, output string, w, h int) error {
+
+	in, err := os.Open(input)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	icon, _ := oksvg.ReadIconStream(in)
+	icon.SetTarget(0, 0, float64(w), float64(h))
+	rgba := image.NewRGBA(image.Rect(0, 0, w, h))
+	icon.Draw(rasterx.NewDasher(w, h, rasterx.NewScannerGV(w, h, rgba, rgba.Bounds())), 1)
+
+	out, err := os.Create(output)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	err = png.Encode(out, rgba)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
