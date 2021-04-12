@@ -91,15 +91,6 @@ func SetEnvironmentVariable(key string, value string) error {
 	return nil
 }
 
-func RemoveString(s []string, r string) []string {
-	for i, v := range s {
-		if v == r {
-			return append(s[:i], s[i+1:]...)
-		}
-	}
-	return s
-}
-
 func GetEnvironmentVariable(key string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return os.Getenv(key), nil
@@ -184,6 +175,15 @@ func Remove(s []string, index int) ([]string, error) {
 		return nil, errors.New("Out of Range Error")
 	}
 	return append(s[:index], s[index+1:]...), nil
+}
+
+func RemoveString(s []string, r string) []string {
+	for i, v := range s {
+		if v == r {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }
 
 //Pretty print the result.
@@ -551,31 +551,20 @@ func Exists(name string) bool {
 }
 
 func CopyFile(source string, dest string) (err error) {
-	sourcefile, err := os.Open(source)
+
+	// call a recursive copy
+	cmd := exec.Command("cp", source, dest)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	if err != nil {
-		return err
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return
 	}
-
-	defer sourcefile.Close()
-
-	destfile, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-
-	defer destfile.Close()
-
-	_, err = io.Copy(destfile, sourcefile)
-	if err == nil {
-		sourceinfo, err := os.Stat(source)
-		if err != nil {
-
-			err = os.Chmod(dest, sourceinfo.Mode())
-		}
-
-	}
-
-	return
+	fmt.Println("Result: " + out.String())
+	return nil
 }
 
 /**
@@ -588,6 +577,29 @@ func CopyDir(source string, dest string) (err error) {
 
 	// call a recursive copy
 	cmd := exec.Command("cp", "-R", source, dest)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return
+	}
+	fmt.Println("Result: " + out.String())
+	return nil
+}
+
+/**
+ * I made use of mv instead of go here...
+ * Be sure the command exist in the computer who run that command.
+ */
+func Move(source string, dest string) (err error) {
+	// First I will create the directory
+	CreateDirIfNotExist(dest)
+
+	// call a recursive copy
+	cmd := exec.Command("mv", source, dest)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -686,15 +698,6 @@ func RemoveDirContents(dir string) error {
 		}
 	}
 	return nil
-}
-
-func RemoveString(s []string, r string) []string {
-	for i, v := range s {
-		if v == r {
-			return append(s[:i], s[i+1:]...)
-		}
-	}
-	return s
 }
 
 /**
