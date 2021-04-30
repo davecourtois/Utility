@@ -39,7 +39,8 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
-	"golang.org/x/sys/windows/registry"
+
+	/*"golang.org/x/sys/windows/registry"*/
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -80,18 +81,18 @@ func SetEnvironmentVariable(key string, value string) error {
 		return os.Setenv(key, value)
 
 	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-
-	err = k.SetStringValue(key, value)
-	if err != nil {
-		return err
-	}
-
+		err = k.SetStringValue(key, value)
+		if err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -99,20 +100,20 @@ func GetEnvironmentVariable(key string) (string, error) {
 	if runtime.GOOS != "windows" {
 		return os.Getenv(key), nil
 	}
-
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return "", err
-	}
-	defer k.Close()
-	var value string
-	value, _, err = k.GetStringValue(key)
-	if err != nil {
-		return value, err
-	}
-	return value, nil
-
-	//return "", nil
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return "", err
+		}
+		defer k.Close()
+		var value string
+		value, _, err = k.GetStringValue(key)
+		if err != nil {
+			return value, err
+		}
+		return value, nil
+	*/
+	return "", nil
 }
 
 func UnsetEnvironmentVariable(key string) error {
@@ -120,18 +121,18 @@ func UnsetEnvironmentVariable(key string) error {
 	if runtime.GOOS != "windows" {
 		return os.Unsetenv(key)
 	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-
-	err = k.DeleteValue(key)
-	if err != nil {
-		return err
-	}
-
+		err = k.DeleteValue(key)
+		if err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
