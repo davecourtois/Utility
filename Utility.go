@@ -179,7 +179,7 @@ func Contains(slice []string, item string) bool {
 
 func Remove(s []string, index int) ([]string, error) {
 	if index >= len(s) {
-		return nil, errors.New("Out of Range Error")
+		return nil, errors.New("out of range Error")
 	}
 	return append(s[:index], s[index+1:]...), nil
 }
@@ -231,10 +231,8 @@ func GetProcessIdsByName(name string) ([]int, error) {
 
 	// map ages
 	for x := range processList {
-		var process ps.Process
-		process = processList[x]
-		if strings.HasPrefix(process.Executable(), name) {
-			pids = append(pids, process.Pid())
+		if strings.HasPrefix(processList[x].Executable(), name) {
+			pids = append(pids, processList[x].Pid())
 		}
 	}
 
@@ -906,15 +904,6 @@ type IPInfo struct {
 	Postal string
 }
 
-func validIP4(ipAddress string) bool {
-	ipAddress = strings.Trim(ipAddress, " ")
-
-	re, _ := regexp.Compile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
-	if re.MatchString(ipAddress) {
-		return true
-	}
-	return false
-}
 
 // getMacAddr gets the MAC hardware
 // address of the host machine
@@ -922,7 +911,7 @@ func MyMacAddr() (addr string) {
 	interfaces, err := net.Interfaces()
 	if err == nil {
 		for _, i := range interfaces {
-			if i.Flags&net.FlagUp != 0 && bytes.Compare(i.HardwareAddr, nil) != 0 {
+			if i.Flags&net.FlagUp != 0 && !bytes.Equal(i.HardwareAddr, nil) {
 				// Don't use random as we have a real address
 				addr = i.HardwareAddr.String()
 				break
@@ -1000,7 +989,7 @@ func IsLocal(address string) bool {
 	host, _ := os.Hostname()
 	for i := 0; i < len(ips); i++ {
 		// TODO find a way to test local address if the server is in the same local network...
-		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.ToUpper(host) == strings.ToUpper(address) {
+		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.EqualFold(host, address) {
 			log.Println(address, " is local")
 			return true
 		}
