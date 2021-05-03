@@ -33,12 +33,14 @@ import (
 	"image"
 	"image/png"
 
-	"github.com/glendc/go-external-ip"
+	externalip "github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
 	"github.com/mitchellh/go-ps"
 	"github.com/pborman/uuid"
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
+
+	"github.com/FlowerWrong/go-hostsfile"
 
 	/*"golang.org/x/sys/windows/registry"*/
 	"golang.org/x/text/encoding/charmap"
@@ -982,6 +984,18 @@ func MyLocalIP() string {
 // Return true if the address can be considere a local address. That can
 // be use to determine if the domain is localhost for exemple.
 func IsLocal(address string) bool {
+
+	local_ips, err := hostsfile.ReverseLookup(address)
+	if err == nil {
+		if len(local_ips) > 0 {
+			// return if the address is part of the local domain.
+			log.Println("---> domain ", address, " was found in local hosts file..." )
+			return Contains(local_ips, MyLocalIP())
+		}
+		// here no local ips is define for the address... so I will continue to look up is it's local or not.
+	}
+
+	// first of all I will get a look in the local host file...
 	ips, _ := net.LookupIP(address)
 	host, _ := os.Hostname()
 	for i := 0; i < len(ips); i++ {

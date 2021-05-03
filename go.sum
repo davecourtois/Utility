@@ -1,6 +1,7 @@
+github.com/FlowerWrong/go-hostsfile v0.0.0-20180523020422-0a383d90e66a h1:k4YI/sQZxczSr76XlbnOkyOcNQkVQEru5uWrXNoQQFI=
+github.com/FlowerWrong/go-hostsfile v0.0.0-20180523020422-0a383d90e66a/go.mod h1:PaTJKDjLdBoHBtvZcAK3TJm7p9ZzMT016SxuTt6IDkM=
 github.com/glendc/go-external-ip v0.0.0-20200601212049-c872357d968e h1:gLpAlmoGqnW3a3GCkOe+Ic8hZoSCfi0PdA0B8j7d6uw=
 github.com/glendc/go-external-ip v0.0.0-20200601212049-c872357d968e/go.mod h1:o9OoDQyE1WHvYVUH1FdFapy1/rCZHHq3O5wS4VA83ig=
-github.com/google/uuid v1.0.0 h1:b4Gk+7WdP/d3HZH8EJsZpvV7EtDOgaZLtnaNGIu1adA=
 github.com/google/uuid v1.0.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.2.0 h1:qJYtXnJRWmpe7m/3XlyhrsLrEURqHRM2kxzoxXqyUDs=
 github.com/google/uuid v1.2.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=

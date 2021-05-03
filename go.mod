@@ -3,6 +3,7 @@ module github.com/davecourtois/Utility
 go 1.16
 
 require (
+	github.com/FlowerWrong/go-hostsfile v0.0.0-20180523020422-0a383d90e66a
 	github.com/glendc/go-external-ip v0.0.0-20200601212049-c872357d968e
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/kalafut/imohash v1.0.2
