@@ -904,7 +904,6 @@ type IPInfo struct {
 	Postal string
 }
 
-
 // getMacAddr gets the MAC hardware
 // address of the host machine
 func MyMacAddr() (addr string) {
@@ -973,12 +972,10 @@ func MyLocalIP() string {
 // Return true if the address can be considere a local address. That can
 // be use to determine if the domain is localhost for exemple.
 func IsLocal(address string) bool {
-
 	local_ips, err := hostsfile.ReverseLookup(address)
 	if err == nil {
 		if len(local_ips) > 0 {
 			// return if the address is part of the local domain.
-			log.Println("---> domain ", address, " was found in local hosts file..." )
 			return Contains(local_ips, MyLocalIP())
 		}
 		// here no local ips is define for the address... so I will continue to look up is it's local or not.
@@ -990,11 +987,9 @@ func IsLocal(address string) bool {
 	for i := 0; i < len(ips); i++ {
 		// TODO find a way to test local address if the server is in the same local network...
 		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.EqualFold(host, address) {
-			log.Println(address, " is local")
 			return true
 		}
 	}
-	log.Println(address, " is not local")
 	return false
 }
 
