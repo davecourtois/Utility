@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	//"syscall"
+	"syscall"
 	"time"
 	"unicode"
 	"unsafe"
@@ -232,11 +232,39 @@ func GetProcessIdsByName(name string) ([]int, error) {
 	// map ages
 	for x := range processList {
 		if strings.HasPrefix(processList[x].Executable(), name) {
+
 			pids = append(pids, processList[x].Pid())
 		}
 	}
 
 	return pids, nil
+}
+
+ // check if the process is actually running
+ // However, on Unix systems, os.FindProcess always succeeds and returns
+ // a Process for the given pid...regardless of whether the process exists
+ // or not.
+ func GetProcessRunningStatus(pid int) (*os.Process, error) {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	//double check if process is running and alive
+	//by sending a signal 0
+	//NOTE : syscall.Signal is not available in Windows
+
+	err = proc.Signal(syscall.Signal(0))
+	if err == nil {
+		return proc, nil
+	}
+
+	if err == syscall.ESRCH {
+		return nil, errors.New("process not running")
+	}
+
+	// default
+	return nil, errors.New("process running but query operation not permitted")
 }
 
 /**
@@ -547,12 +575,16 @@ func CreateDataChecksum(data []byte) string {
 
 // Exists reports whether the named file or directory exists.
 func Exists(name string) bool {
-	if _, err := os.Stat(name); err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
+	if _, err := os.Stat(name); os.IsNotExist(err) {
+		// path/to/whatever does not exist
+		return false
 	}
-	return true
+	
+	if _, err := os.Stat(name); err == nil {
+		return true;
+	}
+	
+	return false
 }
 
 func CopyFile(source string, dest string) (err error) {
