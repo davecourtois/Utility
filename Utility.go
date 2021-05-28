@@ -40,7 +40,7 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 
-	"github.com/FlowerWrong/go-hostsfile"
+	hostsfile "github.com/FlowerWrong/go-hostsfile"
 
 	/*"golang.org/x/sys/windows/registry"*/
 	"golang.org/x/text/encoding/charmap"
@@ -1005,11 +1005,18 @@ func MyLocalIP() string {
 // be use to determine if the domain is localhost for exemple.
 func IsLocal(address string) bool {
 	local_ips, err := hostsfile.ReverseLookup(address)
+
+	// TODO make it work!!!
+	local_ips = append(local_ips, "192.168.0.192")
+	log.Println()
 	if err == nil {
+		log.Println("-----------> 1013", local_ips)
 		if len(local_ips) > 0 {
+			log.Println("-----------> 1015 " )
 			// return if the address is part of the local domain.
 			return Contains(local_ips, MyLocalIP())
 		}
+		
 		// here no local ips is define for the address... so I will continue to look up is it's local or not.
 	}
 
@@ -1846,6 +1853,46 @@ func OpenBrowser(url string) {
 		log.Fatal(err)
 	}
 
+}
+
+/**
+ * Read output and send it to a channel.
+ */
+ func ReadOutput(output chan string, rc io.ReadCloser) {
+
+	cutset := "\r\n"
+	for {
+		buf := make([]byte, 3000)
+		n, err := rc.Read(buf)
+		if err != nil {
+			if err != io.EOF {
+				log.Println(err)
+			}
+			if n == 0 {
+				break
+			}
+		}
+		text := strings.TrimSpace(string(buf[:n]))
+		for {
+			// Take the index of any of the given cutset
+			n := strings.IndexAny(text, cutset)
+			if n == -1 {
+				// If not found, but still have data, send it
+				if len(text) > 0 {
+					output <- text
+				}
+				break
+			}
+			// Send data up to the found cutset
+			output <- text[:n]
+			// If cutset is last element, stop there.
+			if n == len(text) {
+				break
+			}
+			// Shift the text and start again.
+			text = text[n+1:]
+		}
+	}
 }
 
 func SvgToPng(input, output string, w, h int) error {
