@@ -740,7 +740,7 @@ func RemoveDirContents(dir string) error {
 /**
  * Here I will made use of tar to compress the file.
  */
-func CompressDir(src string, buf io.Writer) error {
+func CompressDir(src string, buf io.Writer) (int, error) {
 
 	// First I will create the directory
 	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
@@ -758,17 +758,17 @@ func CompressDir(src string, buf io.Writer) error {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return err
+		return -1, err
 	}
 
 	data, err := ioutil.ReadFile(tmp)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	buf.Write(data)
 
-	return nil
+	return len(data), nil
 }
 
 /**
