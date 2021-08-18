@@ -1544,6 +1544,10 @@ func ToString(value interface{}) string {
 }
 
 func ToInt(value interface{}) int {
+	if value == nil {
+		return 0
+	}
+	
 	var val int
 	if reflect.TypeOf(value).Kind() == reflect.String {
 		val, _ = strconv.Atoi(value.(string))
