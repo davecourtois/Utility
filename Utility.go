@@ -147,7 +147,6 @@ func Log(infos ...interface{}) {
 			for {
 				select {
 				case msg := <-logChannel:
-					log.Println(msg)
 					// Open the log file.
 					f, err := os.OpenFile(os.Args[0]+".log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 					if err == nil {
@@ -281,7 +280,7 @@ func KillProcessByName(name string) error {
 		if err != nil {
 			log.Println(err)
 		}
-		log.Println("Kill ", name, " pid ", pids[i])
+		//log.Println("Kill ", name, " pid ", pids[i])
 		// Kill the process
 		if proc != nil {
 			if !strings.HasPrefix(name, "Globular") {
@@ -740,7 +739,7 @@ func RemoveDirContents(dir string) error {
 /**
  * Here I will made use of tar to compress the file.
  */
-func CompressDir(src string, buf io.Writer) error {
+func CompressDir(src string, buf io.Writer) (int, error) {
 
 	// First I will create the directory
 	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
@@ -758,17 +757,17 @@ func CompressDir(src string, buf io.Writer) error {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return err
+		return -1, err
 	}
 
 	data, err := ioutil.ReadFile(tmp)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	buf.Write(data)
 
-	return nil
+	return len(data), nil
 }
 
 /**
@@ -1007,12 +1006,8 @@ func IsLocal(address string) bool {
 	local_ips, err := hostsfile.ReverseLookup(address)
 
 	// TODO make it work!!!
-	local_ips = append(local_ips, "192.168.0.192")
-	log.Println()
 	if err == nil {
-		log.Println("-----------> 1013", local_ips)
 		if len(local_ips) > 0 {
-			log.Println("-----------> 1015 " )
 			// return if the address is part of the local domain.
 			return Contains(local_ips, MyLocalIP())
 		}
