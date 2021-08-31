@@ -78,11 +78,9 @@ var (
 ///// Note uncomment to compile on windows...
 
 func SetEnvironmentVariable(key string, value string) error {
-	if runtime.GOOS != "windows" {
 
 		return os.Setenv(key, value)
 
-	}
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
@@ -99,9 +97,9 @@ func SetEnvironmentVariable(key string, value string) error {
 }
 
 func GetEnvironmentVariable(key string) (string, error) {
-	if runtime.GOOS != "windows" {
+
 		return os.Getenv(key), nil
-	}
+
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
@@ -120,9 +118,9 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 func UnsetEnvironmentVariable(key string) error {
 
-	if runtime.GOOS != "windows" {
+
 		return os.Unsetenv(key)
-	}
+	
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
