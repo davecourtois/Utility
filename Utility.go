@@ -969,7 +969,7 @@ func DomainHasIp(domain string, ip string) bool {
 // Return the external ip.
 func MyIP() string {
 
-	consensus := externalip.DefaultConsensus(nil, nil)
+	consensus := externalip.DefaultConsensus(&externalip.ConsensusConfig {Timeout: 500* time.Millisecond}, nil)
 	// Get your IP,
 	// which is never <nil> when err is <nil>.
 	ip, err := consensus.ExternalIP()
