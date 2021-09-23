@@ -293,18 +293,19 @@ func KillProcessByName(name string) error {
 	return nil
 }
 
+// Terminate process.
 func TerminateProcess(pid int, exitcode int) error {
 
 	if runtime.GOOS == "windows" {
-		/*
+		
 			h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
 			if e != nil {
 				return e
 			}
 			defer syscall.CloseHandle(h)
 
-			e = syscall.TerminateProcess(h, uint32(exitcode))*/
-		var e error
+			e = syscall.TerminateProcess(h, uint32(exitcode))
+	
 		return e
 	} else {
 		p, err := os.FindProcess(pid)
