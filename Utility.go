@@ -39,8 +39,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
-
-	hostsfile "github.com/FlowerWrong/go-hostsfile"
+	"github.com/txn2/txeh"
 
 	/*"golang.org/x/sys/windows/registry"*/
 	"golang.org/x/text/encoding/charmap"
@@ -992,39 +991,76 @@ func MyLocalIP() string {
 		// check the address type and if it is not a loopback the display it
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
+				//return ipnet.IP.String()
+				ip := ipnet.IP.String()
+				// reject Automatic Private IP address
+				if !strings.HasPrefix(ip, "169.254"){
+					return  ipnet.IP.String()
+				}
 			}
 		}
 	}
 	return ""
 }
 
-// Return true if the address can be considere a local address. That can
-// be use to determine if the domain is localhost for exemple.
-func IsLocal(address string) bool {
-	local_ips, err := hostsfile.ReverseLookup(address)
 
-	// TODO make it work!!!
-	if err == nil {
-		if len(local_ips) > 0 {
-			// return if the address is part of the local domain.
-			return Contains(local_ips, MyLocalIP())
-		}
-		
-		// here no local ips is define for the address... so I will continue to look up is it's local or not.
+// Check if a ip is private.
+func privateIPCheck(ip string) bool {
+	ipAddress := net.ParseIP(ip)
+	return ipAddress.IsPrivate()
+}
+
+// Get the ip from an address
+func GetIpv4(address string) (string, error) {
+	// remove the port number from the address
+	if strings.Contains(address, ":") {
+		address = address[0:strings.Index(address, ":")]
 	}
 
-	// first of all I will get a look in the local host file...
+	// Test if the hostname is in the /etc/hosts file...
+	hosts, err := txeh.NewHostsDefault()
+	if err != nil {
+		return "", err
+	}
+
+	exist, ip, _ := hosts.HostAddressLookup(address)
+	if exist {
+		return ip, nil
+	}
+
+	// I will try to resolve the address from...
 	ips, _ := net.LookupIP(address)
-	host, _ := os.Hostname()
-	for i := 0; i < len(ips); i++ {
-		// TODO find a way to test local address if the server is in the same local network...
-		if strings.ToLower(address) == "localhost" || ips[i].String() == MyIP() || ips[i].String() == MyLocalIP() || ips[i].String() == "127.0.0.1" || strings.EqualFold(host, address) {
-			return true
+	for _, ip := range ips {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			return ipv4.String(), nil
 		}
 	}
+
+	return "", errors.New("no address found for domain " + address)
+}
+
+func IsLocal(hostname string) bool {
+
+	// remove the port number from the address
+	if strings.Contains(hostname, ":") {
+		hostname = hostname[0:strings.Index(hostname, ":")]
+	}
+
+	// Test if the hostname is in the /etc/hosts file...
+	hosts, err := txeh.NewHostsDefault()
+	if err != nil {
+		return false
+	}
+
+	exist, ip, _ := hosts.HostAddressLookup(hostname)
+	if exist {
+		isLocal := privateIPCheck(ip)
+		return isLocal
+	}
+
 	return false
 }
+
 
 // ForeignIP provides information about the given IP address,
 // which should be in dotted-quad form.
