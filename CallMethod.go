@@ -85,12 +85,10 @@ func CallMethod(i interface{}, methodName string, params []interface{}) (interfa
 				if err := recover(); err != nil { //catch
 					*results = []interface{}{nil, err}
 				}
-				fmt.Println("88 ", results)
 				wait <- *results
 			}(wait, &results_)
 
 			results := finalMethod.Call(in)
-			fmt.Println("93 ", results)
 			if len(results) > 0 {
 				if len(results) == 1 {
 					// One result here...
@@ -104,7 +102,6 @@ func CallMethod(i interface{}, methodName string, params []interface{}) (interfa
 								return
 							}
 							results_ = []interface{}{result.Interface(), nil}
-							fmt.Println("107 ", results)
 						}
 					}
 					return
@@ -117,21 +114,14 @@ func CallMethod(i interface{}, methodName string, params []interface{}) (interfa
 
 					if result0 != zeroValue0 && result1 != zeroValue1 {
 						results_ = []interface{}{results[0].Interface(), results[1].Interface()}
-						fmt.Println("120 ", results[0].Interface(), results[1].Interface())
 					} else if result0 == zeroValue0 && result1 != zeroValue1 {
 						results_ = []interface{}{nil, results[1].Interface()}
-						fmt.Println("122 ", results[1].Interface())
 					} else if result0 != zeroValue0 && result1 == zeroValue1 {
-						fmt.Println("123 ", results[0].Interface())
 						results_ = []interface{}{results[0].Interface(), nil}
-					}else{
-						fmt.Println("125 ")
 					}
-					fmt.Println("124 ", results)
 					return
 				}
 			}
-			fmt.Println("128 ")
 			results_ = []interface{}{"", nil}
 		}(wait)
 
