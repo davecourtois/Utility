@@ -78,7 +78,7 @@ var (
 
 func SetEnvironmentVariable(key string, value string) error {
 
-		return os.Setenv(key, value)
+	return os.Setenv(key, value)
 
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
@@ -97,7 +97,7 @@ func SetEnvironmentVariable(key string, value string) error {
 
 func GetEnvironmentVariable(key string) (string, error) {
 
-		return os.Getenv(key), nil
+	return os.Getenv(key), nil
 
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
@@ -117,9 +117,8 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 func UnsetEnvironmentVariable(key string) error {
 
+	return os.Unsetenv(key)
 
-		return os.Unsetenv(key)
-	
 	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
@@ -236,11 +235,46 @@ func GetProcessIdsByName(name string) ([]int, error) {
 	return pids, nil
 }
 
- // check if the process is actually running
- // However, on Unix systems, os.FindProcess always succeeds and returns
- // a Process for the given pid...regardless of whether the process exists
- // or not.
- func GetProcessRunningStatus(pid int) (*os.Process, error) {
+func PidExists(pid int) (bool, error) {
+	if pid <= 0 {
+		return false, fmt.Errorf("invalid pid %v", pid)
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false, err
+	}
+
+	
+	if runtime.GOOS == "windows" {
+		// Todo find a way to test if the process is really running...
+		return true, nil
+	}
+
+	err = proc.Signal(syscall.Signal(0))
+	if err == nil {
+		return true, nil
+	}
+	if err.Error() == "os: process already finished" {
+		return false, nil
+	}
+	errno, ok := err.(syscall.Errno)
+	if !ok {
+		return false, err
+	}
+	switch errno {
+	case syscall.ESRCH:
+		return false, nil
+	case syscall.EPERM:
+		return true, nil
+	}
+	return false, err
+}
+
+// check if the process is actually running
+// However, on Unix systems, os.FindProcess always succeeds and returns
+// a Process for the given pid...regardless of whether the process exists
+// or not.
+func GetProcessRunningStatus(pid int) (*os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return nil, err
@@ -249,6 +283,9 @@ func GetProcessIdsByName(name string) ([]int, error) {
 	//double check if process is running and alive
 	//by sending a signal 0
 	//NOTE : syscall.Signal is not available in Windows
+	if runtime.GOOS == "windows" {
+		return proc, nil
+	}
 
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
@@ -296,7 +333,7 @@ func KillProcessByName(name string) error {
 func TerminateProcess(pid int, exitcode int) error {
 
 	/*if runtime.GOOS == "windows" {
-		
+
 			h, e := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
 			if e != nil {
 				return e
@@ -304,15 +341,15 @@ func TerminateProcess(pid int, exitcode int) error {
 			defer syscall.CloseHandle(h)
 
 			e = syscall.TerminateProcess(h, uint32(exitcode))
-	
+
 		return e
 	} else {*/
-		p, err := os.FindProcess(pid)
-		if err != nil {
-			return err
-		}
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return err
+	}
 
-		return p.Signal(os.Interrupt)
+	return p.Signal(os.Interrupt)
 
 	/*}*/
 }
@@ -576,11 +613,11 @@ func Exists(name string) bool {
 		// path/to/whatever does not exist
 		return false
 	}
-	
+
 	if _, err := os.Stat(name); err == nil {
-		return true;
+		return true
 	}
-	
+
 	return false
 }
 
@@ -969,7 +1006,7 @@ func DomainHasIp(domain string, ip string) bool {
 // Return the external ip.
 func MyIP() string {
 
-	consensus := externalip.DefaultConsensus(&externalip.ConsensusConfig {Timeout: 500* time.Millisecond}, nil)
+	consensus := externalip.DefaultConsensus(&externalip.ConsensusConfig{Timeout: 500 * time.Millisecond}, nil)
 	// Get your IP,
 	// which is never <nil> when err is <nil>.
 	ip, err := consensus.ExternalIP()
@@ -994,15 +1031,14 @@ func MyLocalIP() string {
 				//return ipnet.IP.String()
 				ip := ipnet.IP.String()
 				// reject Automatic Private IP address
-				if !strings.HasPrefix(ip, "169.254"){
-					return  ipnet.IP.String()
+				if !strings.HasPrefix(ip, "169.254") {
+					return ipnet.IP.String()
 				}
 			}
 		}
 	}
 	return ""
 }
-
 
 // Check if a ip is private.
 func privateIPCheck(ip string) bool {
@@ -1060,7 +1096,6 @@ func IsLocal(hostname string) bool {
 
 	return false
 }
-
 
 // ForeignIP provides information about the given IP address,
 // which should be in dotted-quad form.
@@ -1577,7 +1612,7 @@ func ToInt(value interface{}) int {
 	if value == nil {
 		return 0
 	}
-	
+
 	var val int
 	if reflect.TypeOf(value).Kind() == reflect.String {
 		val, _ = strconv.Atoi(value.(string))
@@ -1892,7 +1927,7 @@ func OpenBrowser(url string) {
 /**
  * Read output and send it to a channel.
  */
- func ReadOutput(output chan string, rc io.ReadCloser) {
+func ReadOutput(output chan string, rc io.ReadCloser) {
 
 	cutset := "\r\n"
 	for {
