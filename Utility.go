@@ -1601,6 +1601,13 @@ func ToString(value interface{}) string {
 				str += " "
 			}
 		}
+	}else if reflect.TypeOf(value).String() == "map[string]interface {}" {
+		data, err := json.Marshal(value)
+		if err == nil {
+			return string(data)
+		}else{
+			return "{}"
+		}
 	} else {
 		log.Panicln("Value with type:", reflect.TypeOf(value).String(), "cannot be convert to string")
 	}
