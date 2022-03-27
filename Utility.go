@@ -638,6 +638,34 @@ func CopyFile(source string, dest string) (err error) {
 	return nil
 }
 
+func IsEmpty(name string) (bool, error) {
+    f, err := os.Open(name)
+    if err != nil {
+        return false, err
+    }
+    defer f.Close()
+
+    _, err = f.Readdirnames(1) // Or f.Readdir(1)
+    if err == io.EOF {
+        return true, nil
+    }
+    return false, err // Either not empty or error, suits both cases
+}
+
+func ReadDir(dirname string) ([]os.FileInfo, error) {
+    f, err := os.Open(dirname)
+    if err != nil {
+        return nil, err
+    }
+    list, err := f.Readdir(-1)
+    f.Close()
+    if err != nil {
+        return nil, err
+    }
+    sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })
+    return list, nil
+}
+
 /**
  * I made use of cp instead of go here...
  * Be sure the command exist in the computer who run that command.
