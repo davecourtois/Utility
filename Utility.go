@@ -244,7 +244,6 @@ func PidExists(pid int) (bool, error) {
 		return false, err
 	}
 
-	
 	if runtime.GOOS == "windows" {
 		// Todo find a way to test if the process is really running...
 		return true, nil
@@ -639,31 +638,31 @@ func CopyFile(source string, dest string) (err error) {
 }
 
 func IsEmpty(name string) (bool, error) {
-    f, err := os.Open(name)
-    if err != nil {
-        return false, err
-    }
-    defer f.Close()
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
 
-    _, err = f.Readdirnames(1) // Or f.Readdir(1)
-    if err == io.EOF {
-        return true, nil
-    }
-    return false, err // Either not empty or error, suits both cases
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err // Either not empty or error, suits both cases
 }
 
 func ReadDir(dirname string) ([]os.FileInfo, error) {
-    f, err := os.Open(dirname)
-    if err != nil {
-        return nil, err
-    }
-    list, err := f.Readdir(-1)
-    f.Close()
-    if err != nil {
-        return nil, err
-    }
-    sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })
-    return list, nil
+	f, err := os.Open(dirname)
+	if err != nil {
+		return nil, err
+	}
+	list, err := f.Readdir(-1)
+	f.Close()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })
+	return list, nil
 }
 
 /**
@@ -1000,18 +999,55 @@ type IPInfo struct {
 
 // getMacAddr gets the MAC hardware
 // address of the host machine
-func MyMacAddr() (addr string) {
-	interfaces, err := net.Interfaces()
-	if err == nil {
-		for _, i := range interfaces {
-			if i.Flags&net.FlagUp != 0 && !bytes.Equal(i.HardwareAddr, nil) {
-				// Don't use random as we have a real address
-				addr = i.HardwareAddr.String()
-				break
+func MyMacAddr(ip string) (string, error) {
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	var currentIP, currentNetworkHardwareName string
+
+	for _, address := range addrs {
+
+		// check the address type and if it is not a loopback the display it
+		// = GET LOCAL IP ADDRESS
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				currentIP = ipnet.IP.String()
+				if currentIP == ip {
+					break // the ip was found...
+				}
 			}
 		}
 	}
-	return
+
+	// get all the system's or local machine's network interfaces
+	interfaces, _ := net.Interfaces()
+	for _, interf := range interfaces {
+
+		if addrs, err := interf.Addrs(); err == nil {
+			for /*index*/_ , addr := range addrs {
+				//fmt.Println("[", index, "]", interf.Name, ">", addr)
+
+				// only interested in the name with current IP address
+				if strings.Contains(addr.String(), currentIP) {
+					currentNetworkHardwareName = interf.Name
+				}
+			}
+		}
+	}
+
+	// extract the hardware information base on the interface name
+	// capture above
+	netInterface, err := net.InterfaceByName(currentNetworkHardwareName)
+	if err != nil {
+		return "", err
+	}
+
+	macAddress := netInterface.HardwareAddr
+
+	return macAddress.String(), nil
 }
 
 func DomainHasIp(domain string, ip string) bool {
@@ -1629,11 +1665,11 @@ func ToString(value interface{}) string {
 				str += " "
 			}
 		}
-	}else if reflect.TypeOf(value).String() == "map[string]interface {}" {
+	} else if reflect.TypeOf(value).String() == "map[string]interface {}" {
 		data, err := json.Marshal(value)
 		if err == nil {
 			return string(data)
-		}else{
+		} else {
 			return "{}"
 		}
 	} else {
