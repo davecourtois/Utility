@@ -1096,7 +1096,7 @@ func MyLocalIP() string {
 				ip := ipnet.IP.String()
 				// reject Automatic Private IP address
 				// TODO 
-				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.") || strings.HasPrefix(ip, "172.")){
+				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")){
 					//fmt.Println("-------> local ip is ", ip)
 					return ip
 				}
