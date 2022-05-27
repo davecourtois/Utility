@@ -41,7 +41,7 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-	/*"golang.org/x/sys/windows/registry"*/
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -77,44 +77,47 @@ var (
 ///// Note uncomment to compile on windows...
 
 func SetEnvironmentVariable(key string, value string) error {
-
 	return os.Setenv(key, value)
-
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
-
-		err = k.SetStringValue(key, value)
-		if err != nil {
-			return err
-		}
-	*/
-	return nil
 }
 
 func GetEnvironmentVariable(key string) (string, error) {
 
 	return os.Getenv(key), nil
-
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return "", err
-		}
-		defer k.Close()
-		var value string
-		value, _, err = k.GetStringValue(key)
-		if err != nil {
-			return value, err
-		}
-		return value, nil
-	*/
-	return "", nil
 }
 
+// Need a special function to get access to system variables.
+func SetWindowsEnvironmentVariable(key string, value string) error {
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.SetStringValue(key, value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetWindowsEnvironmentVariable(key string) (string, error) {
+
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+	var value string
+	value, _, err = k.GetStringValue(key)
+	if err != nil {
+		return value, err
+	}
+	
+	return value, nil
+
+}
 func UnsetEnvironmentVariable(key string) error {
 
 	return os.Unsetenv(key)
@@ -1027,7 +1030,7 @@ func MyMacAddr(ip string) (string, error) {
 	for _, interf := range interfaces {
 
 		if addrs, err := interf.Addrs(); err == nil {
-			for /*index*/_ , addr := range addrs {
+			for /*index*/ _, addr := range addrs {
 				//fmt.Println("[", index, "]", interf.Name, ">", addr)
 
 				// only interested in the name with current IP address
@@ -1095,8 +1098,8 @@ func MyLocalIP() string {
 				//return ipnet.IP.String()
 				ip := ipnet.IP.String()
 				// reject Automatic Private IP address
-				// TODO 
-				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")){
+				// TODO
+				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")) {
 					//fmt.Println("-------> local ip is ", ip)
 					return ip
 				}
