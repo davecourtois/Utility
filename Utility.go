@@ -114,26 +114,28 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 	if err != nil {
 		return value, err
 	}
-	
+
 	return value, nil
 
 }
 func UnsetEnvironmentVariable(key string) error {
 
 	return os.Unsetenv(key)
+}
 
-	/*
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
+func UnsetWindowsEnvironmentVariable(key string) error {
 
-		err = k.DeleteValue(key)
-		if err != nil {
-			return err
-		}
-	*/
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+
+	err = k.DeleteValue(key)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
