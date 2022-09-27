@@ -41,7 +41,7 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-	"golang.org/x/sys/windows/registry"
+	//"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -87,7 +87,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
-
+/*
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
@@ -100,10 +100,12 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 	}
 
 	return nil
+*/
+return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
-
+/*
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
@@ -116,6 +118,8 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 	}
 
 	return value, nil
+*/
+  return "", errors.New("available on windows only")
 
 }
 func UnsetEnvironmentVariable(key string) error {
@@ -124,7 +128,7 @@ func UnsetEnvironmentVariable(key string) error {
 }
 
 func UnsetWindowsEnvironmentVariable(key string) error {
-
+/*
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
@@ -137,6 +141,8 @@ func UnsetWindowsEnvironmentVariable(key string) error {
 	}
 
 	return nil
+*/
+	return errors.New("available on windows only")
 }
 
 func Log(infos ...interface{}) {
