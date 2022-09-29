@@ -1,6 +1,10 @@
 package Utility
 
 import (
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"bytes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -30,8 +34,8 @@ import (
 	"unicode"
 	"unsafe"
 
-	"image"
-	"image/png"
+	"github.com/nfnt/resize"
+	"github.com/polds/imgbase64"
 
 	externalip "github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
@@ -40,6 +44,7 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
+	"github.com/chai2010/webp"
 
 	//"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
@@ -2073,4 +2078,83 @@ func SvgToPng(input, output string, w, h int) error {
 	}
 
 	return nil
+}
+
+/**
+ * Create a thumbnail...
+ */
+ func CreateThumbnail(path string, thumbnailMaxHeight int, thumbnailMaxWidth int) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+
+	// Set the buffer pointer back to the begening of the file...
+	file.Seek(0, 0)
+	var originalImg image.Image
+
+	if strings.HasSuffix(file.Name(), ".png") || strings.HasSuffix(file.Name(), ".PNG") {
+		originalImg, err = png.Decode(file)
+	} else if strings.HasSuffix(file.Name(), ".jpeg") || strings.HasSuffix(file.Name(), ".jpg") || strings.HasSuffix(file.Name(), ".JPEG") || strings.HasSuffix(file.Name(), ".JPG") {
+		originalImg, err = jpeg.Decode(file)
+	} else if strings.HasSuffix(file.Name(), ".gif") || strings.HasSuffix(file.Name(), ".GIF") {
+		originalImg, err = gif.Decode(file)
+	}else if strings.HasSuffix(file.Name(), ".webp") || strings.HasSuffix(file.Name(), ".WEBP") {
+		originalImg, err = webp.Decode(file)
+	} else {
+		return "", errors.New("the image must be of type png or jpg")
+	}
+
+	if err != nil {
+		fmt.Println("fail to create thumnail with error: ", err)
+		return "", err
+	}
+
+	// I will get the ratio for the new image size to respect the scale.
+	hRatio := thumbnailMaxHeight / originalImg.Bounds().Size().Y
+	wRatio := thumbnailMaxWidth / originalImg.Bounds().Size().X
+
+	var h int
+	var w int
+
+	// First I will try with the height
+	if hRatio*originalImg.Bounds().Size().Y < thumbnailMaxWidth {
+		h = thumbnailMaxHeight
+		w = hRatio * originalImg.Bounds().Size().Y
+	} else {
+		// So here i will use it width
+		h = wRatio * thumbnailMaxHeight
+		w = thumbnailMaxWidth
+	}
+
+	// do not zoom...
+	if hRatio > 1 {
+		h = originalImg.Bounds().Size().Y
+	}
+
+	if wRatio > 1 {
+		w = originalImg.Bounds().Size().X
+	}
+
+	// Now I will calculate the image size...
+	img := resize.Resize(uint(h), uint(w), originalImg, resize.Lanczos3)
+
+	var buf bytes.Buffer
+	if strings.HasSuffix(file.Name(), ".png") || strings.HasSuffix(file.Name(), ".PNG") {
+		err = png.Encode(&buf, img)
+	} else {
+		err = jpeg.Encode(&buf, img, &jpeg.Options{jpeg.DefaultQuality})
+	}
+
+	if err != nil {
+		fmt.Println("fail to generate thumbnail with error ", err)
+		return "", err
+	}
+
+	// Now I will save the buffer containt to the thumbnail...
+	thumbnail := imgbase64.FromBuffer(buf)
+	file.Seek(0, 0) // Set the reader back to the begenin of the file...
+
+
+	return thumbnail, nil
 }
