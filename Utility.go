@@ -1,10 +1,6 @@
 package Utility
 
 import (
-	"image"
-	"image/gif"
-	"image/jpeg"
-	"image/png"
 	"bytes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -13,6 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"log"
@@ -37,6 +37,7 @@ import (
 	"github.com/nfnt/resize"
 	"github.com/polds/imgbase64"
 
+	"github.com/chai2010/webp"
 	externalip "github.com/glendc/go-external-ip"
 	"github.com/kalafut/imohash"
 	"github.com/mitchellh/go-ps"
@@ -44,7 +45,6 @@ import (
 	"github.com/srwiley/oksvg"
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
-	"github.com/chai2010/webp"
 
 	//"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
@@ -71,9 +71,9 @@ const (
 	STD_BASE_64_PATTERN        = `^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$`
 )
 
-//////////////////////////////////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////////////
 // Logging to a file...
-//////////////////////////////////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////////////
 var (
 	logChannel = make(chan string)
 	logFct     func()
@@ -92,39 +92,39 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
-/*
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	err = k.SetStringValue(key, value)
-	if err != nil {
-		return err
-	}
+		err = k.SetStringValue(key, value)
+		if err != nil {
+			return err
+		}
 
-	return nil
-*/
-return errors.New("available on windows only")
+		return nil
+	*/
+	return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
-/*
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return "", err
-	}
-	defer k.Close()
-	var value string
-	value, _, err = k.GetStringValue(key)
-	if err != nil {
-		return value, err
-	}
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return "", err
+		}
+		defer k.Close()
+		var value string
+		value, _, err = k.GetStringValue(key)
+		if err != nil {
+			return value, err
+		}
 
-	return value, nil
-*/
-  return "", errors.New("available on windows only")
+		return value, nil
+	*/
+	return "", errors.New("available on windows only")
 
 }
 func UnsetEnvironmentVariable(key string) error {
@@ -133,20 +133,20 @@ func UnsetEnvironmentVariable(key string) error {
 }
 
 func UnsetWindowsEnvironmentVariable(key string) error {
-/*
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
+	/*
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+		if err != nil {
+			return err
+		}
+		defer k.Close()
 
-	err = k.DeleteValue(key)
-	if err != nil {
-		return err
-	}
+		err = k.DeleteValue(key)
+		if err != nil {
+			return err
+		}
 
-	return nil
-*/
+		return nil
+	*/
 	return errors.New("available on windows only")
 }
 
@@ -204,7 +204,7 @@ func RemoveString(s []string, r string) []string {
 	return s
 }
 
-//Pretty print the result.
+// Pretty print the result.
 func PrettyPrint(b []byte) ([]byte, error) {
 	var out bytes.Buffer
 	err := json.Indent(&out, b, "", "  ")
@@ -2083,7 +2083,7 @@ func SvgToPng(input, output string, w, h int) error {
 /**
  * Create a thumbnail...
  */
- func CreateThumbnail(path string, thumbnailMaxHeight int, thumbnailMaxWidth int) (string, error) {
+func CreateThumbnail(path string, thumbnailMaxHeight int, thumbnailMaxWidth int) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -2099,7 +2099,7 @@ func SvgToPng(input, output string, w, h int) error {
 		originalImg, err = jpeg.Decode(file)
 	} else if strings.HasSuffix(file.Name(), ".gif") || strings.HasSuffix(file.Name(), ".GIF") {
 		originalImg, err = gif.Decode(file)
-	}else if strings.HasSuffix(file.Name(), ".webp") || strings.HasSuffix(file.Name(), ".WEBP") {
+	} else if strings.HasSuffix(file.Name(), ".webp") || strings.HasSuffix(file.Name(), ".WEBP") {
 		originalImg, err = webp.Decode(file)
 	} else {
 		return "", errors.New("the image must be of type png or jpg")
@@ -2110,34 +2110,40 @@ func SvgToPng(input, output string, w, h int) error {
 		return "", err
 	}
 
-	// I will get the ratio for the new image size to respect the scale.
-	hRatio := thumbnailMaxHeight / originalImg.Bounds().Size().Y
-	wRatio := thumbnailMaxWidth / originalImg.Bounds().Size().X
-
-	var h int
-	var w int
-
-	// First I will try with the height
-	if hRatio*originalImg.Bounds().Size().Y < thumbnailMaxWidth {
-		h = thumbnailMaxHeight
-		w = hRatio * originalImg.Bounds().Size().Y
+	var img image.Image
+	if thumbnailMaxHeight == -1 && thumbnailMaxWidth == -1 {
+		img = originalImg
 	} else {
-		// So here i will use it width
-		h = wRatio * thumbnailMaxHeight
-		w = thumbnailMaxWidth
-	}
+		// I will get the ratio for the new image size to respect the scale.
+		hRatio := thumbnailMaxHeight / originalImg.Bounds().Size().Y
+		wRatio := thumbnailMaxWidth / originalImg.Bounds().Size().X
 
-	// do not zoom...
-	if hRatio > 1 {
-		h = originalImg.Bounds().Size().Y
-	}
+		var h int
+		var w int
 
-	if wRatio > 1 {
-		w = originalImg.Bounds().Size().X
-	}
+		// First I will try with the height
+		if hRatio*originalImg.Bounds().Size().Y < thumbnailMaxWidth {
+			h = thumbnailMaxHeight
+			w = hRatio * originalImg.Bounds().Size().Y
+		} else {
+			// So here i will use it width
+			h = wRatio * thumbnailMaxHeight
+			w = thumbnailMaxWidth
+		}
 
-	// Now I will calculate the image size...
-	img := resize.Resize(uint(h), uint(w), originalImg, resize.Lanczos3)
+		// do not zoom...
+		if hRatio > 1 {
+			h = originalImg.Bounds().Size().Y
+		}
+
+		if wRatio > 1 {
+			w = originalImg.Bounds().Size().X
+		}
+
+		// Now I will calculate the image size...
+		img = resize.Resize(uint(h), uint(w), originalImg, resize.Lanczos3)
+
+	}
 
 	var buf bytes.Buffer
 	if strings.HasSuffix(file.Name(), ".png") || strings.HasSuffix(file.Name(), ".PNG") {
@@ -2154,7 +2160,6 @@ func SvgToPng(input, output string, w, h int) error {
 	// Now I will save the buffer containt to the thumbnail...
 	thumbnail := imgbase64.FromBuffer(buf)
 	file.Seek(0, 0) // Set the reader back to the begenin of the file...
-
 
 	return thumbnail, nil
 }
