@@ -2080,6 +2080,90 @@ func SvgToPng(input, output string, w, h int) error {
 	return nil
 }
 
+
+/**
+ * Store meta data into a file.
+ */
+ func SetMetadata(path, key, value string) error {
+
+	// ffmpeg -i input.mp4 -metadata title="The video titile" -c copy output.mp4
+	path = strings.ReplaceAll(path, "\\", "/")
+	ext := path[strings.LastIndex(path, ".") + 1:]
+
+	// ffmpeg -i input.mp4 -metadata title="The video titile" -c copy output.mp4
+	// Try more than once...
+	nbTry := 15 * 60
+	var err error
+
+	// Generate the video in a temp file...
+	dest := strings.ReplaceAll(path, "." + ext, ".temp." + ext)
+	if Exists(dest) {
+		os.Remove(dest)
+	}
+
+	for nbTry > 0 {
+		cmd := exec.Command("ffmpeg", `-i`, path, `-metadata`, key+`=`+value, `-c`, `copy`, dest)
+		cmd.Dir = filepath.Dir(path)
+		done := make(chan bool)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		output := make(chan string)
+
+		// Process message util the command is done.
+		go func() {
+			for {
+				select {
+				case <-done:
+					break
+
+				case result := <-output:
+					fmt.Println(result)
+				}
+			}
+		}()
+
+		// Start reading the output
+		// Start reading the output
+		go ReadOutput(output, stdout)
+		err = cmd.Run()
+		if err != nil || !Exists(dest) {
+			fmt.Println("fail to create metadata with error ", err, " try again in 5 sec...", nbTry)
+			nbTry-- // give it time
+			time.Sleep(2 * time.Second)
+		} else if Exists(dest) {
+			// Remove the original file...
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+
+			// rename the file...
+			err = os.Rename(dest, path)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}
+		if err != nil {
+			fmt.Println("fail to run command ", err)
+			return err
+		}
+
+		cmd.Wait()
+
+		// Close the output.
+		stdout.Close()
+		done <- true
+
+	}
+
+	return err
+}
+
+
 /**
  * Create a thumbnail...
  */
@@ -2102,7 +2186,7 @@ func CreateThumbnail(path string, thumbnailMaxHeight int, thumbnailMaxWidth int)
 	} else if strings.HasSuffix(file.Name(), ".webp") || strings.HasSuffix(file.Name(), ".WEBP") {
 		originalImg, err = webp.Decode(file)
 	} else {
-		return "", errors.New("the image must be of type png or jpg")
+		return "", errors.New("the image must be of type png or jpg " + file.Name() + " image format not found")
 	}
 
 	if err != nil {
