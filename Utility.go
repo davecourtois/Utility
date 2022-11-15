@@ -2080,23 +2080,52 @@ func SvgToPng(input, output string, w, h int) error {
 	return nil
 }
 
+/**
+ * Download an image from an url...
+ */
+ func DownloadFile(URL, fileName string) error {
+	//Get the response bytes from the url
+	response, err := http.Get(URL)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return errors.New("Received non 200 response code")
+	}
+	//Create a empty file
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	//Write the bytes to the fiel
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 /**
  * Store meta data into a file.
  */
- func SetMetadata(path, key, value string) error {
+func SetMetadata(path, key, value string) error {
 
 	// ffmpeg -i input.mp4 -metadata title="The video titile" -c copy output.mp4
 	path = strings.ReplaceAll(path, "\\", "/")
-	ext := path[strings.LastIndex(path, ".") + 1:]
+	ext := path[strings.LastIndex(path, ".")+1:]
 
 	// ffmpeg -i input.mp4 -metadata title="The video titile" -c copy output.mp4
 	// Try more than once...
-	nbTry := 15 * 60
+	nbTry := 30
 	var err error
 
 	// Generate the video in a temp file...
-	dest := strings.ReplaceAll(path, "." + ext, ".temp." + ext)
+	dest := strings.ReplaceAll(path, "."+ext, ".temp."+ext)
 	if Exists(dest) {
 		os.Remove(dest)
 	}
@@ -2129,7 +2158,7 @@ func SvgToPng(input, output string, w, h int) error {
 		go ReadOutput(output, stdout)
 		err = cmd.Run()
 		if err != nil || !Exists(dest) {
-			fmt.Println("fail to create metadata with error ", err, " try again in 5 sec...", nbTry)
+			fmt.Println("fail to create metadata with error ", err, " try again in 5 sec...", path, nbTry)
 			nbTry-- // give it time
 			time.Sleep(2 * time.Second)
 		} else if Exists(dest) {
@@ -2162,7 +2191,6 @@ func SvgToPng(input, output string, w, h int) error {
 
 	return err
 }
-
 
 /**
  * Create a thumbnail...
