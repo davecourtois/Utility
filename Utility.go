@@ -53,6 +53,68 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// Base on https://go.dev/doc/modules/version-numbers for version number
+type Version struct {
+	Major      int
+	Minor      int
+	Patch      int
+	PreRelease string
+}
+
+func NewVersion(str string) *Version {
+	v := new(Version)
+	v.Parse(str)
+	return v
+}
+
+// Parse values from string
+func (v *Version) Parse(str string) {
+	values := strings.Split(str, ".")
+
+	v.Major = ToInt(strings.ReplaceAll(values[0], "v", ""))
+	v.Minor = ToInt(values[1])
+	if strings.Contains(values[2], "-") {
+		v.Patch = ToInt(strings.Split(values[2], "-")[0])
+		v.PreRelease = strings.Split(values[2], "-")[1]
+	} else {
+		v.Patch = ToInt(values[2])
+	}
+}
+
+// Stringnify the vesion.
+func (v *Version) ToString() string {
+	str := "v" + ToString(v.Major) + "." + ToString(v.Minor) + "." + ToString(v.Patch)
+
+	if len(v.PreRelease) > 0 {
+		str += "-" + v.PreRelease
+	}
+	return str
+}
+
+// Compare tow version, 1 means v is newer than to, 0 is the same, -1 is older.
+func (v *Version) Compare(to *Version) int {
+	if v.Major > to.Major {
+		return 1
+	} else if v.Major < to.Major {
+		return -1
+	}
+
+	if v.Minor > to.Minor {
+		return 1
+	} else if v.Minor < to.Minor {
+		return -1
+	}
+
+	if v.Patch > to.Patch {
+		return 1
+	} else if v.Patch < to.Patch {
+		return -1
+	}
+
+	// here all info are equal the Pre-Release info is not comparable...
+	return 0
+}
+
 const (
 	/*
 		A JavaScript identifier must start with a letter, underscore (_), or dollar sign ($);
@@ -2083,7 +2145,7 @@ func SvgToPng(input, output string, w, h int) error {
 /**
  * Download an image from an url...
  */
- func DownloadFile(URL, fileName string) error {
+func DownloadFile(URL, fileName string) error {
 	//Get the response bytes from the url
 	response, err := http.Get(URL)
 	if err != nil {
@@ -2108,6 +2170,32 @@ func SvgToPng(input, output string, w, h int) error {
 	}
 
 	return nil
+}
+
+/**
+ * Read movie file metadata...
+ */
+func ReadMetadata(path string) (map[string]interface{}, error){
+	cmd := exec.Command(`ffprobe`, `-hide_banner`, `-loglevel`, `fatal`, `-show_format`, `-print_format`, `json`, `-i`, path)
+	cmd.Dir = os.TempDir()
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make(map[string]interface{})
+	err = json.Unmarshal(out.Bytes(), &infos)
+	if err != nil {
+		return nil, err
+	}
+
+	return infos, nil
 }
 
 /**
@@ -2190,6 +2278,28 @@ func SetMetadata(path, key, value string) error {
 	}
 
 	return err
+}
+
+func GetVideoDuration(path string) int {
+	path = strings.ReplaceAll(path, "\\", "/")
+	// original command...
+	// ffprobe -v quiet -print_format compact=print_section=0:nokey=1:escape=csv -show_entries format=duration bob_ross_img-0-Animated.mp4
+	cmd := exec.Command("ffprobe", `-v`, `quiet`, `-print_format`, `compact=print_section=0:nokey=1:escape=csv`, `-show_entries`, `format=duration`, path)
+	cmd.Dir = filepath.Dir(path)
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		return 0.0
+	}
+
+	duration, _ := strconv.ParseFloat(strings.TrimSpace(out.String()), 64)
+	
+	return ToInt(duration + 0.5)
 }
 
 /**
