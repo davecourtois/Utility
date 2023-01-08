@@ -959,10 +959,14 @@ func FindFileByName(path string, name string) ([]string, error) {
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(name, ".") {
 			if err == nil && strings.HasSuffix(info.Name(), name) {
-				files = append(files, path)
+				if !info.IsDir() {
+					files = append(files, path)
+				}
 			}
 		} else if err == nil && info.Name() == name {
-			files = append(files, path)
+			if !info.IsDir() {
+				files = append(files, path)
+			}
 		}
 		return err
 	})
@@ -1164,8 +1168,10 @@ func MyLocalIP() string {
 	// GetLocalIP returns the non loopback local IP of the host
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
+		fmt.Println("fail to get inet address with error ", err)
 		return ""
 	}
+
 	for _, address := range addrs {
 		// check the address type and if it is not a loopback the display it
 		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
@@ -1175,13 +1181,22 @@ func MyLocalIP() string {
 				// reject Automatic Private IP address
 				// TODO
 				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")) {
-					//fmt.Println("-------> local ip is ", ip)
 					return ip
 				}
 			}
 		}
 	}
-	return ""
+
+	// I will give more time read local address.
+	for i:=60; i > 0; i++ {
+		time.Sleep(1 * time.Second)
+		ip := MyLocalIP()
+		if len(ip) > 0 {
+			return ip
+		}
+	}
+	
+	return "127.0.0.1" // return loopback
 }
 
 // Check if a ip is private.
@@ -2175,7 +2190,7 @@ func DownloadFile(URL, fileName string) error {
 /**
  * Read movie file metadata...
  */
-func ReadMetadata(path string) (map[string]interface{}, error){
+func ReadMetadata(path string) (map[string]interface{}, error) {
 	cmd := exec.Command(`ffprobe`, `-hide_banner`, `-loglevel`, `fatal`, `-show_format`, `-print_format`, `json`, `-i`, path)
 	cmd.Dir = os.TempDir()
 
@@ -2298,7 +2313,7 @@ func GetVideoDuration(path string) int {
 	}
 
 	duration, _ := strconv.ParseFloat(strings.TrimSpace(out.String()), 64)
-	
+
 	return ToInt(duration + 0.5)
 }
 
