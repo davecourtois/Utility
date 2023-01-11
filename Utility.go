@@ -960,12 +960,12 @@ func FindFileByName(path string, name string) ([]string, error) {
 		if strings.HasPrefix(name, ".") {
 			if err == nil && strings.HasSuffix(info.Name(), name) {
 				if !info.IsDir() {
-					files = append(files, path)
+					files = append(files, strings.ReplaceAll(path, "\\", "/"))
 				}
 			}
 		} else if err == nil && info.Name() == name {
 			if !info.IsDir() {
-				files = append(files, path)
+				files = append(files, strings.ReplaceAll(path, "\\", "/"))
 			}
 		}
 		return err
