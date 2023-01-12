@@ -896,7 +896,8 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Println("tar", "-czvf", tmp, "-C", src, ".")
+		fmt.Println("fail to compress file with error: ", fmt.Sprint(err) + ": " + stderr.String())
 		return -1, err
 	}
 
@@ -916,8 +917,7 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 func ExtractTarGz(r io.Reader) (string, error) {
 
 	// First I will create the directory
-	tmp := RandomUUID() + ".tgz"
-	//defer os.Remove(tmp)
+	archive := RandomUUID() + ".tgz"
 
 	// Now the buffer contain the .tgz data
 	buf, err := ioutil.ReadAll(r)
@@ -926,28 +926,40 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	}
 
 	// Here I will write the data into a tgz file...
-	err = ioutil.WriteFile(os.TempDir()+"/"+tmp, buf, 0777)
+	err = ioutil.WriteFile(os.TempDir()+"/"+archive, buf, 0777)
 	if err != nil {
 		return "", err
 	}
+	
 	prevDir, _ := os.Getwd()
-	os.Chdir(os.TempDir())
-	defer os.Chdir(prevDir)
+	err = os.Chdir(os.TempDir())
+	if err != nil {
+		fmt.Println("fail to change path to ", os.TempDir(), err )
+		return "", err
+	}
+
 
 	// Untar into the output dir and return it path.
 	output := RandomUUID()
 	CreateDirIfNotExist(os.TempDir() + "/" + output)
 
-	cmd := exec.Command("tar", "-xvzf", tmp, "-C", output, "--strip-components", "1")
+	cmd := exec.Command("tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
 	cmd.Dir = os.TempDir()
-	log.Println("extract file: tar -xvzf ", tmp)
+	log.Println("extract file: tar -xvzf ", archive)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Println("fail to run: tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
+		fmt.Println("error ",fmt.Sprint(err) + ": " + stderr.String())
+		return "", err
+	}
+
+	err = os.Chdir(prevDir)
+	if err != nil {
+		fmt.Println("fail to change path to ", prevDir, err )
 		return "", err
 	}
 
