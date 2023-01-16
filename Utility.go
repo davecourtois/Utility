@@ -154,38 +154,38 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
-	
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return err
-		}
-		defer k.Close()
 
-		err = k.SetStringValue(key, value)
-		if err != nil {
-			return err
-		}
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
 
-		return nil
-	
+	err = k.SetStringValue(key, value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 	//return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
-	
-		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
-		if err != nil {
-			return "", err
-		}
-		defer k.Close()
-		var value string
-		value, _, err = k.GetStringValue(key)
-		if err != nil {
-			return value, err
-		}
 
-		return value, nil
-	
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	if err != nil {
+		return "", err
+	}
+	defer k.Close()
+	var value string
+	value, _, err = k.GetStringValue(key)
+	if err != nil {
+		return value, err
+	}
+
+	return value, nil
+
 	//return "", errors.New("available on windows only")
 
 }
@@ -882,7 +882,10 @@ func RemoveDirContents(dir string) error {
 func CompressDir(src string, buf io.Writer) (int, error) {
 
 	// First I will create the directory
-	tmp := os.TempDir() + "/" + RandomUUID() + ".tgz"
+
+	tmp := os.TempDir() + "/" + RandomUUID() + ".tar.gz"
+	tmp = strings.ReplaceAll(tmp, "\\", "/")
+	src = strings.ReplaceAll(src, "\\", "/")
 
 	defer os.Remove(tmp)
 
@@ -897,7 +900,7 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println("tar", "-czvf", tmp, "-C", src, ".")
-		fmt.Println("fail to compress file with error: ", fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Println("fail to compress file with error: ", fmt.Sprint(err)+": "+stderr.String())
 		return -1, err
 	}
 
@@ -917,35 +920,36 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 func ExtractTarGz(r io.Reader) (string, error) {
 
 	// First I will create the directory
-	archive := RandomUUID() + ".tgz"
+	archive := RandomUUID() + ".tar.gz"
 
-	// Now the buffer contain the .tgz data
+	// Now the buffer contain the .tar.gz data
 	buf, err := ioutil.ReadAll(r)
 	if err != nil {
 		return "", err
 	}
 
-	// Here I will write the data into a tgz file...
-	err = ioutil.WriteFile(os.TempDir()+"/"+archive, buf, 0777)
-	if err != nil {
-		return "", err
-	}
 	
-	prevDir, _ := os.Getwd()
-	err = os.Chdir(os.TempDir())
+
+	// Here I will write the data into a tar.gz file...
+	err = ioutil.WriteFile(strings.ReplaceAll(os.TempDir(), "\\", "/") +"/"+archive, buf, 0777)
 	if err != nil {
-		fmt.Println("fail to change path to ", os.TempDir(), err )
 		return "", err
 	}
 
+	prevDir, _ := os.Getwd()
+	err = os.Chdir(strings.ReplaceAll(os.TempDir(), "\\", "/"))
+	if err != nil {
+		fmt.Println("fail to change path to ", strings.ReplaceAll(os.TempDir(), "\\", "/"), err)
+		return "", err
+	}
 
 	// Untar into the output dir and return it path.
 	output := RandomUUID()
-	CreateDirIfNotExist(os.TempDir() + "/" + output)
+	CreateDirIfNotExist(strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + output)
 
 	cmd := exec.Command("tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
-	cmd.Dir = os.TempDir()
-	log.Println("extract file: tar -xvzf ", archive)
+	cmd.Dir = strings.ReplaceAll(os.TempDir(), "\\", "/")
+	fmt.Println("extract file: tar -xvzf ", archive)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -953,20 +957,21 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	err = cmd.Run()
 	if err != nil {
 		fmt.Println("fail to run: tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
-		fmt.Println("error ",fmt.Sprint(err) + ": " + stderr.String())
+		fmt.Println("error ", fmt.Sprint(err)+": "+stderr.String())
 		return "", err
 	}
 
 	err = os.Chdir(prevDir)
 	if err != nil {
-		fmt.Println("fail to change path to ", prevDir, err )
+		fmt.Println("fail to change path to ", prevDir, err)
 		return "", err
 	}
 
-	return os.TempDir() + "/" + output, nil
+	return strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + output, nil
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
+	path = strings.ReplaceAll(path, "\\", "/")
 	files := make([]string, 0)
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(name, ".") {
@@ -990,6 +995,8 @@ func FindFileByName(path string, name string) ([]string, error) {
 // destination file exists, all it's contents will be replaced by the contents
 // of the source file.
 func copyFileContents(src, dst string) (err error) {
+	src = strings.ReplaceAll(src, "\\", "/")
+	dst = strings.ReplaceAll(dst, "\\", "/")
 	in, err := os.Open(src)
 	if err != nil {
 		return
@@ -1200,14 +1207,14 @@ func MyLocalIP() string {
 	}
 
 	// I will give more time read local address.
-	for i:=60; i > 0; i++ {
+	for i := 60; i > 0; i++ {
 		time.Sleep(1 * time.Second)
 		ip := MyLocalIP()
 		if len(ip) > 0 {
 			return ip
 		}
 	}
-	
+
 	return "127.0.0.1" // return loopback
 }
 
