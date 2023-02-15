@@ -928,10 +928,8 @@ func ExtractTarGz(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	
-
 	// Here I will write the data into a tar.gz file...
-	err = ioutil.WriteFile(strings.ReplaceAll(os.TempDir(), "\\", "/") +"/"+archive, buf, 0777)
+	err = ioutil.WriteFile(strings.ReplaceAll(os.TempDir(), "\\", "/")+"/"+archive, buf, 0777)
 	if err != nil {
 		return "", err
 	}
@@ -971,6 +969,7 @@ func ExtractTarGz(r io.Reader) (string, error) {
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
+
 	path = strings.ReplaceAll(path, "\\", "/")
 	files := make([]string, 0)
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
@@ -2232,6 +2231,66 @@ func ReadMetadata(path string) (map[string]interface{}, error) {
 	return infos, nil
 }
 
+func RunCmd(name, dir string, args []string, wait chan error) {
+
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+
+	pid := -1
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		// exit
+		wait <- err
+		return
+	}
+
+	fmt.Println("run command: ", name, args)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	output := make(chan string)
+	done := make(chan error)
+
+	// Process message util the command is done.
+	go func() {
+		for {
+			select {
+			case err := <-done:
+				wait <- err // unblock it...
+				break
+
+			case result := <-output:
+				if cmd.Process != nil {
+					pid = cmd.Process.Pid
+				}
+				// display command output...
+				fmt.Println(name+":", pid, result)
+			}
+		}
+	}()
+
+	// Start reading the output
+	go ReadOutput(output, stdout)
+	err = cmd.Run()
+	if err != nil {
+		cmd_str := name
+		for i := 0; i < len(args); i++ {
+			cmd_str += " " + args[i]
+		}
+		done <- errors.New(cmd_str + " </br> " + fmt.Sprint(err) + ": " + stderr.String())
+		return // no need to wait here...
+	}
+
+	//err = cmd.Wait() // wait for the command to complete.
+
+	// Close the output.
+	stdout.Close()
+
+	done <- err
+}
+
 /**
  * Store meta data into a file.
  */
@@ -2253,34 +2312,22 @@ func SetMetadata(path, key, value string) error {
 	}
 
 	for nbTry > 0 {
-		cmd := exec.Command("ffmpeg", `-i`, path, `-metadata`, key+`=`+value, `-c`, `copy`, dest)
-		cmd.Dir = filepath.Dir(path)
-		done := make(chan bool)
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			return err
+		// Generate the video in a temp file...
+		dest := strings.ReplaceAll(path, "."+ext, ".temp."+ext)
+		if Exists(dest) {
+			os.Remove(dest)
 		}
-		output := make(chan string)
 
-		// Process message util the command is done.
-		go func() {
-			for {
-				select {
-				case <-done:
-					break
+		args := []string{"-i", path, "-c:v", "copy"}
+		args = append(args, "-c:a", "copy", "-c:s", "mov_text", "-map", "0")
+		args = append(args, `-metadata`, key+`=`+value, dest)
 
-				case result := <-output:
-					fmt.Println(result)
-				}
-			}
-		}()
+		wait := make(chan error)
+		RunCmd("ffmpeg", filepath.Dir(path), args, wait)
+		err = <-wait
 
-		// Start reading the output
-		// Start reading the output
-		go ReadOutput(output, stdout)
-		err = cmd.Run()
 		if err != nil || !Exists(dest) {
-			fmt.Println("fail to create metadata with error ", err, " try again in 5 sec...", path, nbTry)
+			fmt.Println("fail to create metadata with error ", err, " try again in 2 sec...", path, nbTry)
 			nbTry-- // give it time
 			time.Sleep(2 * time.Second)
 		} else if Exists(dest) {
@@ -2302,12 +2349,6 @@ func SetMetadata(path, key, value string) error {
 			fmt.Println("fail to run command ", err)
 			return err
 		}
-
-		cmd.Wait()
-
-		// Close the output.
-		stdout.Close()
-		done <- true
 
 	}
 
