@@ -14,6 +14,5 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20210320200257-875f767ac39a
 	github.com/srwiley/rasterx v0.0.0-20200120212402-85cb7272f5e9
 	github.com/txn2/txeh v1.3.0
-	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
-	golang.org/x/text v0.3.6
+	golang.org/x/text v0.3.8
 )
