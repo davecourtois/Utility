@@ -2235,7 +2235,6 @@ func RunCmd(name, dir string, args []string, wait chan error) {
 
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
-
 	pid := -1
 
 	stdout, err := cmd.StdoutPipe()
@@ -2284,7 +2283,7 @@ func RunCmd(name, dir string, args []string, wait chan error) {
 	}
 
 	//err = cmd.Wait() // wait for the command to complete.
-
+	
 	// Close the output.
 	stdout.Close()
 
