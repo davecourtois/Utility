@@ -711,7 +711,7 @@ func CopyFile(source string, dest string) (err error) {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return
 	}
-	fmt.Println("Result: " + out.String())
+
 	return nil
 }
 
@@ -775,16 +775,27 @@ func Move(source string, dest string) (err error) {
 	CreateDirIfNotExist(dest)
 
 	// call a recursive copy
-	cmd := exec.Command("mv", source, dest)
+	rsync := exec.Command("rsync","-a", source, dest)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	rsync.Stdout = &out
+	rsync.Stderr = &stderr
+	err = rsync.Run()
 	if err != nil {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		return
 	}
+
+	// Now I will remove the source dir...
+	rm := exec.Command("rm","-rf", source)
+	rm.Stdout = &out
+	rm.Stderr = &stderr
+	err = rm.Run()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		return
+	}
+
 	fmt.Println("Result: " + out.String())
 	return nil
 }
