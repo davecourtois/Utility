@@ -931,7 +931,7 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 func ExtractTarGz(r io.Reader) (string, error) {
 
 	// First I will create the directory
-	archive := RandomUUID() + ".tar.gz"
+	archive :=  strings.ReplaceAll(os.TempDir(), "\\", "/")+"/"+ RandomUUID() + ".tar.gz"
 
 	// Now the buffer contain the .tar.gz data
 	buf, err := ioutil.ReadAll(r)
@@ -940,43 +940,29 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	}
 
 	// Here I will write the data into a tar.gz file...
-	err = ioutil.WriteFile(strings.ReplaceAll(os.TempDir(), "\\", "/")+"/"+archive, buf, 0777)
+	err = ioutil.WriteFile(archive, buf, 0777)
 	if err != nil {
 		return "", err
 	}
 
-	prevDir, _ := os.Getwd()
-	err = os.Chdir(strings.ReplaceAll(os.TempDir(), "\\", "/"))
-	if err != nil {
-		fmt.Println("fail to change path to ", strings.ReplaceAll(os.TempDir(), "\\", "/"), err)
-		return "", err
-	}
+	fmt.Println("archive saved at ",archive)
 
 	// Untar into the output dir and return it path.
-	output := RandomUUID()
-	CreateDirIfNotExist(strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + output)
+	output :=strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID()
+	CreateDirIfNotExist(output)
 
-	cmd := exec.Command("tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
-	cmd.Dir = strings.ReplaceAll(os.TempDir(), "\\", "/")
-	fmt.Println("extract file: tar -xvzf ", archive)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	wait := make(chan error)
+	RunCmd("tar", output, []string{"-xvzf", archive, "-C", output, "--strip-components", "1"}, wait)
+
+	err =<- wait;
 	if err != nil {
 		fmt.Println("fail to run: tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
-		fmt.Println("error ", fmt.Sprint(err)+": "+stderr.String())
 		return "", err
 	}
 
-	err = os.Chdir(prevDir)
-	if err != nil {
-		fmt.Println("fail to change path to ", prevDir, err)
-		return "", err
-	}
-
-	return strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + output, nil
+	fmt.Println("archive is extracted at ", output, err)
+	
+	return output, nil
 }
 
 func FindFileByName(path string, name string) ([]string, error) {
