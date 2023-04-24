@@ -46,7 +46,7 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-	//"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -155,7 +155,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
 	}
@@ -166,14 +166,14 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 		return err
 	}
 
-	return nil*/
+	return nil
 
-	return errors.New("available on windows only")
+	//return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
 	}
@@ -184,9 +184,9 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 		return value, err
 	}
 
-	return value, nil*/
+	return value, nil
 
-	return "", errors.New("available on windows only")
+	//return "", errors.New("available on windows only")
 
 }
 func UnsetEnvironmentVariable(key string) error {
@@ -773,21 +773,32 @@ func CopyDir(source string, dest string) (err error) {
 func Move(source string, dest string) (err error) {
 	// First I will create the directory
 	CreateDirIfNotExist(dest)
-
-	// call a recursive copy
-	rsync := exec.Command("rsync","-a", source, dest)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
-	rsync.Stdout = &out
-	rsync.Stderr = &stderr
-	err = rsync.Run()
-	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		return
+
+	if runtime.GOOS == "windows" {
+		rsync := exec.Command("mv", source, dest)
+		rsync.Stdout = &out
+		rsync.Stderr = &stderr
+		err = rsync.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			return
+		}
+	} else {
+		// call a recursive copy
+		rsync := exec.Command("rsync", "-a", source, dest)
+		rsync.Stdout = &out
+		rsync.Stderr = &stderr
+		err = rsync.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			return
+		}
 	}
 
 	// Now I will remove the source dir...
-	rm := exec.Command("rm","-rf", source)
+	rm := exec.Command("rm", "-rf", source)
 	rm.Stdout = &out
 	rm.Stderr = &stderr
 	err = rm.Run()
@@ -931,7 +942,7 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 func ExtractTarGz(r io.Reader) (string, error) {
 
 	// First I will create the directory
-	archive :=  strings.ReplaceAll(os.TempDir(), "\\", "/")+"/"+ RandomUUID() + ".tar.gz"
+	archive := strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID() + ".tar.gz"
 
 	// Now the buffer contain the .tar.gz data
 	buf, err := ioutil.ReadAll(r)
@@ -945,23 +956,23 @@ func ExtractTarGz(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	fmt.Println("archive saved at ",archive)
+	fmt.Println("archive saved at ", archive)
 
 	// Untar into the output dir and return it path.
-	output :=strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID()
+	output := strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID()
 	CreateDirIfNotExist(output)
 
 	wait := make(chan error)
 	RunCmd("tar", output, []string{"-xvzf", archive, "-C", output, "--strip-components", "1"}, wait)
 
-	err =<- wait;
+	err = <-wait
 	if err != nil {
 		fmt.Println("fail to run: tar", "-xvzf", archive, "-C", output, "--strip-components", "1")
 		return "", err
 	}
 
 	fmt.Println("archive is extracted at ", output, err)
-	
+
 	return output, nil
 }
 
@@ -2279,7 +2290,7 @@ func RunCmd(name, dir string, args []string, wait chan error) {
 	}
 
 	//err = cmd.Wait() // wait for the command to complete.
-	
+
 	// Close the output.
 	stdout.Close()
 
@@ -2371,7 +2382,6 @@ func GetVideoDuration(path string) int {
 
 	return ToInt(duration + 0.5)
 }
-
 
 /**
  * Create a thumbnail...
