@@ -963,11 +963,16 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	CreateDirIfNotExist(output)
 
 	wait := make(chan error)
-	RunCmd("tar", output, []string{"-xvzf", archive, "-C", output, "--force-local", "--strip-components", "1"}, wait)
+	args := []string{"-xvzf", archive, "-C", output, "--strip-components", "1"}
+	if runtime.GOOS == "windows" {
+		args = append(args, "--force-local")
+	}
+
+	RunCmd("tar", output, args, wait)
 
 	err = <-wait
 	if err != nil {
-		fmt.Println("fail to run: tar", "-xvzf", archive, "-C", output, "--force-local", "--strip-components", "1")
+		fmt.Println("fail to run: tar ", args)
 		return "", err
 	}
 
