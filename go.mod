@@ -15,6 +15,6 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20200120212402-85cb7272f5e9
 	github.com/txn2/txeh v1.3.0
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
-	golang.org/x/sys v0.0.0-20210423082822-04245dca01da
+	golang.org/x/sys v0.1.0
 	golang.org/x/text v0.3.6
 )
