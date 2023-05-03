@@ -46,7 +46,7 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-	//"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/registry"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -155,7 +155,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
 	}
@@ -166,14 +166,14 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 		return err
 	}
 
-	return nil*/
+	return nil
 
 	return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
 	}
@@ -184,7 +184,7 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 		return value, err
 	}
 
-	return value, nil*/
+	return value, nil
 
 	return "", errors.New("available on windows only")
 
@@ -904,15 +904,15 @@ func RemoveDirContents(dir string) error {
 func CompressDir(src string, buf io.Writer) (int, error) {
 
 	// First I will create the directory
-
-	tmp := os.TempDir() + "/" + RandomUUID() + ".tar.gz"
-	tmp = strings.ReplaceAll(tmp, "\\", "/")
 	src = strings.ReplaceAll(src, "\\", "/")
+	tmp := RandomUUID() + ".tar.gz"
 
 	defer os.Remove(tmp)
 
+	args := []string{"-czvf", tmp, "-C", src, "."}
+
 	// Compress the directory
-	cmd := exec.Command("tar", "-czvf", tmp, "-C", src, ".")
+	cmd := exec.Command("tar", args...)
 	cmd.Dir = os.TempDir()
 
 	var out bytes.Buffer
@@ -920,13 +920,14 @@ func CompressDir(src string, buf io.Writer) (int, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+
 	if err != nil {
 		fmt.Println("tar", "-czvf", tmp, "-C", src, ".")
 		fmt.Println("fail to compress file with error: ", fmt.Sprint(err)+": "+stderr.String())
 		return -1, err
 	}
 
-	data, err := ioutil.ReadFile(tmp)
+	data, err := ioutil.ReadFile(os.TempDir() + string(os.PathSeparator) + tmp)
 	if err != nil {
 		return -1, err
 	}
@@ -940,9 +941,7 @@ func CompressDir(src string, buf io.Writer) (int, error) {
  * Extract a tar gz file and return the path where the data is...
  */
 func ExtractTarGz(r io.Reader) (string, error) {
-
-	// First I will create the directory
-	archive := strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID() + ".tar.gz"
+	tmpDir := strings.ReplaceAll(os.TempDir(), "\\", "/")
 
 	// Now the buffer contain the .tar.gz data
 	buf, err := ioutil.ReadAll(r)
@@ -950,25 +949,23 @@ func ExtractTarGz(r io.Reader) (string, error) {
 		return "", err
 	}
 
+	// First I will create the directory
+	archive := RandomUUID() + ".tar.gz"
+
 	// Here I will write the data into a tar.gz file...
-	err = ioutil.WriteFile(archive, buf, 0777)
+	err = ioutil.WriteFile(tmpDir+"/"+archive, buf, 0777)
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Println("archive saved at ", archive)
-
 	// Untar into the output dir and return it path.
-	output := strings.ReplaceAll(os.TempDir(), "\\", "/") + "/" + RandomUUID()
+	output := tmpDir + "/" + RandomUUID()
 	CreateDirIfNotExist(output)
-
+	
 	wait := make(chan error)
 	args := []string{"-xvzf", archive, "-C", output, "--strip-components", "1"}
-	if runtime.GOOS == "windows" {
-		args = append(args, "--force-local")
-	}
 
-	RunCmd("tar", output, args, wait)
+	RunCmd("tar", tmpDir, args, wait)
 
 	err = <-wait
 	if err != nil {
