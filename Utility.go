@@ -1208,14 +1208,24 @@ func MyLocalIP() string {
 				// TODO
 				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")) {
 					return ip
+				}else{
+					// in case of ip in range of 172.17.* to 172.31.* (EC2 for exemple use this range.)
+					values := strings.Split(ip, ".")
+					val_0 := ToInt(values[0])
+					val_1 := ToInt(values[1])
+					if val_0 == 172  && val_1 >= 17 && val_1 <= 31{
+						return ip
+					}
 				}
 			}
 		}
 	}
 
 	// I will give more time read local address.
-	for i := 60; i > 0; i++ {
+	for i := 15; i > 0; i++ {
+
 		time.Sleep(1 * time.Second)
+		fmt.Println("try to get local ip...")
 		ip := MyLocalIP()
 		if len(ip) > 0 {
 			return ip
