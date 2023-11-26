@@ -46,11 +46,16 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-	"golang.org/x/sys/windows/registry"
+
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
+
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
+
+	//"golang.org/x/sys/windows/registry"
 )
 
 // Base on https://go.dev/doc/modules/version-numbers for version number
@@ -155,7 +160,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
 	}
@@ -166,14 +171,14 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 		return err
 	}
 
-	return nil
+	return nil*/
 
 	return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
 
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
 	}
@@ -184,11 +189,12 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 		return value, err
 	}
 
-	return value, nil
+	return value, nil*/
 
 	return "", errors.New("available on windows only")
 
 }
+
 func UnsetEnvironmentVariable(key string) error {
 
 	return os.Unsetenv(key)
@@ -685,17 +691,19 @@ func CreateDataChecksum(data []byte) string {
 }
 
 // Exists reports whether the named file or directory exists.
-func Exists(name string) bool {
-	if _, err := os.Stat(name); os.IsNotExist(err) {
-		// path/to/whatever does not exist
+func Exists(filePath string) bool {
+	_, err := os.Stat(filePath)
+
+	if err == nil {
+		// File exists
+		return true
+	} else if os.IsNotExist(err) {
+		// File does not exist
+		return false
+	} else {
+		// Other error (e.g., permission issues)
 		return false
 	}
-
-	if _, err := os.Stat(name); err == nil {
-		return true
-	}
-
-	return false
 }
 
 func CopyFile(source string, dest string) (err error) {
@@ -1107,6 +1115,56 @@ type IPInfo struct {
 	Postal string
 }
 
+
+
+func Ping(domain string) error {
+	ipAddr, err := net.ResolveIPAddr("ip4", domain)
+	if err != nil {
+		return fmt.Errorf("error resolving IP address: %v", err)
+	}
+
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return fmt.Errorf("error listening for ICMP packets: %v", err)
+	}
+	defer conn.Close()
+
+	// Create an ICMP message
+	message := icmp.Message{
+		Type: ipv4.ICMPTypeEcho,
+		Code: 0,
+		Body: &icmp.Echo{
+			ID:   os.Getpid() & 0xffff,
+			Seq:  1,
+			Data: []byte("HELLO-R-U-THERE"),
+		},
+	}
+
+	// Serialize the ICMP message
+	messageBytes, err := message.Marshal(nil)
+	if err != nil {
+		return fmt.Errorf("error marshalling ICMP message: %v", err)
+	}
+
+	// Send the ICMP message
+	_, err = conn.WriteTo(messageBytes, ipAddr)
+	if err != nil {
+		return fmt.Errorf("error sending ICMP message: %v", err)
+	}
+
+	// Set a deadline for receiving the response
+	conn.SetReadDeadline(time.Now().Add(time.Second * 3))
+
+	// Receive the response
+	responseBytes := make([]byte, 1500)
+	_, _, err = conn.ReadFrom(responseBytes)
+	if err != nil {
+		return fmt.Errorf("error receiving ICMP response: %v", err)
+	}
+
+	return nil
+}
+
 // getMacAddr gets the MAC hardware
 // address of the host machine
 func MyMacAddr(ip string) (string, error) {
@@ -1156,7 +1214,6 @@ func MyMacAddr(ip string) (string, error) {
 	}
 
 	macAddress := netInterface.HardwareAddr
-
 	return macAddress.String(), nil
 }
 
@@ -1190,52 +1247,100 @@ func MyIP() string {
 	return ""
 }
 
-// Return the local ip.
-func MyLocalIP() string {
-
-	// GetLocalIP returns the non loopback local IP of the host
+func MyIPv6() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		fmt.Println("fail to get inet address with error ", err)
-		return ""
+		return "", err
 	}
 
-	for _, address := range addrs {
-		// check the address type and if it is not a loopback the display it
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				//return ipnet.IP.String()
-				ip := ipnet.IP.String()
-				// reject Automatic Private IP address
-				// TODO
-				if !strings.HasPrefix(ip, "169.254.") && (strings.HasPrefix(ip, "192.168.") || strings.HasPrefix(ip, "10.")) {
-					return ip
-				}else{
-					// in case of ip in range of 172.17.* to 172.31.* (EC2 for exemple use this range.)
-					values := strings.Split(ip, ".")
-					val_0 := ToInt(values[0])
-					val_1 := ToInt(values[1])
-					if val_0 == 172  && val_1 >= 17 && val_1 <= 31{
-						return ip
-					}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() == nil && ipnet.IP.To16() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("IPv6 address not found")
+}
+
+/**
+ * Return the primary ip address of the computer.
+ */
+func GetPrimaryIPAddress() (string, error) {
+	// Get a list of network interfaces
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	// Iterate through the interfaces
+	for _, iface := range interfaces {
+		// Skip loopback and non-up interfaces
+		if iface.Flags&net.FlagLoopback != 0 || (iface.Flags&net.FlagUp == 0) {
+			continue
+		}
+
+		// Get addresses for the interface
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+
+		// Iterate through the addresses
+		for _, addr := range addrs {
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				return "", err
+			}
+
+			// Check if it's an IPv4 address and not a link-local or loopback address
+			if ip.To4() != nil && !ip.IsLinkLocalUnicast() && !ip.IsLoopback() {
+				return ip.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("No primary local IP address found")
+}
+
+/**
+ * Return the ip address with the given mac address.
+ */
+func MyLocalIP(mac string) (string, error) {
+
+	// Get a list of network interfaces
+	interfStat, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+
+	// Iterate through the interfaces
+	for _, interf := range interfStat {
+		if interf.HardwareAddr.String() == mac {
+			addrs, err := interf.Addrs()
+			if err != nil {
+				return "", err
+			}
+
+			// Iterate through the addresses
+			for _, addr := range addrs {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					return "", err
+				}
+
+				// Check if it's an IPv4 address and not a link-local or loopback address
+				if ip.To4() != nil && !ip.IsLinkLocalUnicast() && !ip.IsLoopback() {
+					return ip.String(), nil
 				}
 			}
 		}
 	}
 
-	// I will give more time read local address.
-	for i := 15; i > 0; i++ {
-
-		time.Sleep(1 * time.Second)
-		fmt.Println("try to get local ip...")
-		ip := MyLocalIP()
-		if len(ip) > 0 {
-			return ip
-		}
-	}
-
-	return "127.0.0.1" // return loopback
+	return "", fmt.Errorf("No local IP address found for mac address " + mac)
 }
+
 
 // Check if a ip is private.
 func privateIPCheck(ip string) bool {
