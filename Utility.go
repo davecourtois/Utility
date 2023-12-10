@@ -1361,7 +1361,7 @@ func GetIpv4(address string) (string, error) {
 		return "", err
 	}
 
-	exist, ip, _ := hosts.HostAddressLookup(address)
+	exist, ip, _ := hosts.HostAddressLookup(address, txeh.IPFamilyV4)
 	if exist {
 		return ip, nil
 	}
@@ -1390,7 +1390,7 @@ func IsLocal(hostname string) bool {
 		return false
 	}
 
-	exist, ip, _ := hosts.HostAddressLookup(hostname)
+	exist, ip, _ := hosts.HostAddressLookup(hostname, txeh.IPFamilyV4)
 	if exist {
 		isLocal := privateIPCheck(ip)
 		return isLocal
