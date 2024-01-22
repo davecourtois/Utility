@@ -1,6 +1,7 @@
 package Utility
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -46,15 +47,13 @@ import (
 	"github.com/srwiley/rasterx"
 	"github.com/txn2/txeh"
 
-
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
-
+	"github.com/dhowden/tag"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-
 	//"golang.org/x/sys/windows/registry"
 )
 
@@ -969,7 +968,7 @@ func ExtractTarGz(r io.Reader) (string, error) {
 	// Untar into the output dir and return it path.
 	output := tmpDir + "/" + RandomUUID()
 	CreateDirIfNotExist(output)
-	
+
 	wait := make(chan error)
 	args := []string{"-xvzf", archive, "-C", output, "--strip-components", "1"}
 
@@ -1114,8 +1113,6 @@ type IPInfo struct {
 	// Postal holds the post code or zip code region of the ISP location.
 	Postal string
 }
-
-
 
 func Ping(domain string) error {
 	ipAddr, err := net.ResolveIPAddr("ip4", domain)
@@ -1340,7 +1337,6 @@ func MyLocalIP(mac string) (string, error) {
 
 	return "", fmt.Errorf("No local IP address found for mac address " + mac)
 }
-
 
 // Check if a ip is private.
 func privateIPCheck(ip string) bool {
@@ -2582,4 +2578,222 @@ func CreateThumbnail(path string, thumbnailMaxHeight int, thumbnailMaxWidth int)
 	file.Seek(0, 0) // Set the reader back to the begenin of the file...
 
 	return thumbnail, nil
+}
+
+func ScanIPs() ([]string, error) {
+    // Run the arp -a command
+    cmd := exec.Command("arp", "-a")
+    var out bytes.Buffer
+    cmd.Stdout = &out
+    err := cmd.Run()
+    if err != nil {
+        return nil, fmt.Errorf("failed to execute command: %w", err)
+    }
+
+    // Regular expression to find IPv4 addresses
+    re := regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`)
+
+    var ips []string
+    scanner := bufio.NewScanner(&out)
+    for scanner.Scan() {
+        line := scanner.Text()
+        ip := re.FindString(line)
+        if ip != "" {
+            ips = append(ips, ip)
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return nil, fmt.Errorf("error reading output: %w", err)
+    }
+
+    return ips, nil
+}
+
+func GetHostnameIPMap(localIp string) map[string]string {
+
+	localNetworks := make([]string, 0)
+	if localIp != "" {
+		if strings.HasPrefix(localIp, "192.168.0.") {
+			localNetworks = append(localNetworks, "192.168.0.0/24")
+		} else if strings.HasPrefix(localIp, "10.") {
+			localNetworks = append(localNetworks, "10.0.0.0/24")
+		} else if strings.HasPrefix(localIp, "172.") {
+			localNetworks = append(localNetworks, "172.16.0.0/24")
+		}
+	}
+
+	hostnameIPMap := make(map[string]string)
+	for i := 0; i < len(localNetworks); i++ {
+		hostnameIPMap_, err := getHostnameIPMap(localNetworks[i])
+		if err == nil {
+			for k, v := range hostnameIPMap_ {
+				hostnameIPMap[k] = v
+			}
+		}
+	}
+
+	return hostnameIPMap
+}
+
+
+func getHostnameIPMap(localnetwork string) (map[string]string, error) {
+	// Run the nmap command
+	cmd := exec.Command("nmap", "-sn", localnetwork)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running nmap: %v", err)
+	}
+
+	awkCmd := exec.Command("awk", "/for/ && $6 != \"\" {gsub(/[()]/, \"\"); print $5, $6}")
+	awkCmd.Stdin = strings.NewReader(string(output))
+
+	awkOutput, err := awkCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running awk: %v", err)
+	}
+
+	hostnameIPMap := make(map[string]string)
+	scanner := bufio.NewScanner(strings.NewReader(string(awkOutput)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		hostnameIPMap[strings.Split(line, " ")[1]] = strings.Split(line, " ")[0]
+	}
+
+	return hostnameIPMap, nil
+}
+
+func fileNameWithoutExtension(fileName string) string {
+	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
+}
+
+func ReadAudioMetadata(path string, thumnailHeight, thumbnailWidth int) (map[string]interface{}, error) {
+
+	path = strings.ReplaceAll(path, "\\", "/")
+	f_, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	defer f_.Close()
+
+	m, err := tag.ReadFrom(f_)
+	var metadata map[string]interface{}
+
+	if err == nil {
+		metadata = make(map[string]interface{})
+		metadata["Album"] = m.Album()
+		metadata["AlbumArtist"] = m.AlbumArtist()
+		metadata["Artist"] = m.Artist()
+		metadata["Comment"] = m.Comment()
+		metadata["Composer"] = m.Composer()
+		metadata["FileType"] = m.FileType()
+		metadata["Format"] = m.Format()
+		metadata["Genre"] = m.Genre()
+		metadata["Lyrics"] = m.Lyrics()
+		metadata["Picture"] = m.Picture()
+		metadata["Raw"] = m.Raw()
+		metadata["Title"] = m.Title()
+		if len(m.Title()) == 0 {
+			metadata["Title"] = fileNameWithoutExtension(filepath.Base(path))
+		}
+		metadata["Year"] = m.Year()
+
+		metadata["DisckNumber"], _ = m.Disc()
+		_, metadata["DiscTotal"] = m.Disc()
+
+		metadata["TrackNumber"], _ = m.Track()
+		_, metadata["TrackTotal"] = m.Track()
+
+		if m.Picture() != nil {
+
+			// Determine the content type of the image file
+			mimeType := m.Picture().MIMEType
+
+			// Prepend the appropriate URI scheme header depending
+			fileName := RandomUUID()
+
+			// on the MIME type
+			switch mimeType {
+			case "image/jpg":
+				fileName += ".jpg"
+			case "image/jpeg":
+				fileName += ".jpg"
+			case "image/png":
+				fileName += ".png"
+			}
+
+			imagePath := os.TempDir() + "/" + fileName
+			defer os.Remove(imagePath)
+
+			os.WriteFile(imagePath, m.Picture().Data, 0664)
+
+			if Exists(imagePath) {
+				metadata["ImageUrl"], _ = CreateThumbnail(imagePath, thumnailHeight, thumbnailWidth)
+			}
+
+		} else {
+
+			imagePath := path[:strings.LastIndex(path, "/")]
+
+			// Try to find the cover image...
+			if Exists(imagePath + "/cover.jpg") {
+				imagePath += "/cover.jpg"
+			} else if Exists(imagePath + "/Cover.jpg") {
+				imagePath += "/Cover.jpg"
+			} else if Exists(imagePath + "/folder.jpg") {
+				imagePath += "/folder.jpg"
+			} else if Exists(imagePath + "/Folder.jpg") {
+				imagePath += "/Folder.jpg"
+			} else if Exists(imagePath + "/AlbumArt.jpg") {
+				imagePath += "/AlbumArt.jpg"
+			} else if Exists(imagePath + "/Front.jpg") {
+				imagePath += "/Front.jpg"
+			} else if Exists(imagePath + "/front.jpg") {
+				imagePath += "/front.jpg"
+			} else if Exists(imagePath + "/thumb.jpg") {
+				imagePath += "/thumb.jpg"
+			} else if Exists(imagePath + "/Thumbnail.jpg") {
+				imagePath += "/Thumbnail.jpg"
+			} else {
+				// take the first found image it that case...
+				images := GetFilePathsByExtension(imagePath, ".jpg")
+				if len(images) > 0 {
+					imagePath = images[0]
+					for i := 0; i < len(images); i++ {
+						imagePath_ := images[i]
+						if strings.Contains(strings.ToLower(imagePath_), "front") || strings.Contains(strings.ToLower(imagePath_), "folder") || strings.Contains(strings.ToLower(imagePath_), "cover") {
+
+							imagePath = imagePath_
+							if strings.HasSuffix(strings.ToLower(imagePath_), "front.jpg") || strings.HasSuffix(strings.ToLower(imagePath_), "cover.jpg") {
+								break
+							}
+						}
+					}
+				} else {
+					images := GetFilePathsByExtension(imagePath[0:strings.LastIndex(imagePath, "/")], ".jpg")
+					if len(images) > 0 {
+						imagePath = images[0]
+						for i := 0; i < len(images); i++ {
+							imagePath_ := images[i]
+							if strings.Contains(strings.ToLower(imagePath_), "front") || strings.Contains(strings.ToLower(imagePath_), "folder") || strings.Contains(strings.ToLower(imagePath_), "cover") {
+								imagePath = imagePath_
+								if strings.HasSuffix(strings.ToLower(imagePath_), "front.jpg") || strings.HasSuffix(strings.ToLower(imagePath_), "cover.jpg") {
+									break
+								}
+							}
+						}
+					}
+
+				}
+			}
+
+			if Exists(imagePath) {
+				metadata["ImageUrl"], _ = CreateThumbnail(imagePath, 300, 300)
+			}
+		}
+	} else {
+		return nil, err
+	}
+	return metadata, nil
 }
