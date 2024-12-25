@@ -54,7 +54,8 @@ import (
 	"github.com/dhowden/tag"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-	//"golang.org/x/sys/windows/registry"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 // Base on https://go.dev/doc/modules/version-numbers for version number
@@ -159,7 +160,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
 	}
@@ -170,14 +171,14 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 		return err
 	}
 
-	return nil*/
+	return nil
 
-	return errors.New("available on windows only")
+	//return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
 
-	/*k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
 	}
@@ -188,9 +189,9 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 		return value, err
 	}
 
-	return value, nil*/
+	return value, nil
 
-	return "", errors.New("available on windows only")
+	//return "", errors.New("available on windows only")
 
 }
 
@@ -200,7 +201,7 @@ func UnsetEnvironmentVariable(key string) error {
 }
 
 func UnsetWindowsEnvironmentVariable(key string) error {
-	/*
+	
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
 			return err
@@ -213,8 +214,8 @@ func UnsetWindowsEnvironmentVariable(key string) error {
 		}
 
 		return nil
-	*/
-	return errors.New("available on windows only")
+	
+	//return errors.New("available on windows only")
 }
 
 func Log(infos ...interface{}) {
@@ -1166,8 +1167,10 @@ func Ping(domain string) error {
 // address of the host machine
 func MyMacAddr(ip string) (string, error) {
 
+	fmt.Println("------> get Mac address for address: ", ip)
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
+		fmt.Println("------------> 1175", err)
 		return "", err
 	}
 
@@ -1190,14 +1193,13 @@ func MyMacAddr(ip string) (string, error) {
 	// get all the system's or local machine's network interfaces
 	interfaces, _ := net.Interfaces()
 	for _, interf := range interfaces {
-
+		
 		if addrs, err := interf.Addrs(); err == nil {
-			for /*index*/ _, addr := range addrs {
-				//fmt.Println("[", index, "]", interf.Name, ">", addr)
-
+			for _, addr := range addrs {
 				// only interested in the name with current IP address
 				if strings.Contains(addr.String(), currentIP) {
 					currentNetworkHardwareName = interf.Name
+					break
 				}
 			}
 		}
@@ -1211,6 +1213,7 @@ func MyMacAddr(ip string) (string, error) {
 	}
 
 	macAddress := netInterface.HardwareAddr
+
 	return macAddress.String(), nil
 }
 
