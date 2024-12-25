@@ -18,8 +18,11 @@ require (
 	golang.org/x/text v0.3.6
 )
 
+require github.com/otiai10/gosseract v2.2.1+incompatible // indirect
+
 require (
 	github.com/google/uuid v1.2.0 // indirect
+	github.com/otiai10/gosseract/v2 v2.4.1
 	github.com/twmb/murmur3 v1.1.5 // indirect
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410 // indirect
 	golang.org/x/sys v0.0.0-20210423082822-04245dca01da // indirect

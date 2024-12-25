@@ -2797,3 +2797,33 @@ func ReadAudioMetadata(path string, thumnailHeight, thumbnailWidth int) (map[str
 	}
 	return metadata, nil
 }
+
+// ExtractTextFromJpeg extracts text from a JPEG image at the given path
+func ExtractTextFromJpeg(path string) (string, error) {
+	// Check if the input file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return "", fmt.Errorf("input file does not exist: %s", path)
+	}
+
+	// Generate the output file path by replacing the extension with .txt
+	outputPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".txt"
+
+	// Run the Tesseract command-line tool
+	cmd := exec.Command("tesseract", path, strings.TrimSuffix(outputPath, ".txt"))
+	cmd.Stderr = os.Stderr // Redirect errors to standard error
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to run tesseract: %w", err)
+	}
+
+	// Read the output file
+	outputData, err := os.ReadFile(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read output file: %w", err)
+	}
+
+	// Clean up the output file after reading
+	defer os.Remove(outputPath)
+
+	// Return the extracted text as a string
+	return string(outputData), nil
+}
