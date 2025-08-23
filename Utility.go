@@ -55,7 +55,7 @@ import (
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 
-	"golang.org/x/sys/windows/registry"
+	// "golang.org/x/sys/windows/registry"
 )
 
 // Base on https://go.dev/doc/modules/version-numbers for version number
@@ -159,7 +159,7 @@ func GetEnvironmentVariable(key string) (string, error) {
 
 // Need a special function to get access to system variables.
 func SetWindowsEnvironmentVariable(key string, value string) error {
-
+/*
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return err
@@ -172,12 +172,12 @@ func SetWindowsEnvironmentVariable(key string, value string) error {
 	}
 
 	return nil
-
-	//return errors.New("available on windows only")
+*/
+	return errors.New("available on windows only")
 }
 
 func GetWindowsEnvironmentVariable(key string) (string, error) {
-
+/*
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 	if err != nil {
 		return "", err
@@ -190,8 +190,8 @@ func GetWindowsEnvironmentVariable(key string) (string, error) {
 	}
 
 	return value, nil
-
-	//return "", errors.New("available on windows only")
+*/
+	return "", errors.New("available on windows only")
 
 }
 
@@ -201,7 +201,7 @@ func UnsetEnvironmentVariable(key string) error {
 }
 
 func UnsetWindowsEnvironmentVariable(key string) error {
-	
+	/*
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\ControlSet001\Control\Session Manager\Environment`, registry.ALL_ACCESS)
 		if err != nil {
 			return err
@@ -214,8 +214,8 @@ func UnsetWindowsEnvironmentVariable(key string) error {
 		}
 
 		return nil
-	
-	//return errors.New("available on windows only")
+	*/
+	return errors.New("available on windows only")
 }
 
 func Log(infos ...interface{}) {
@@ -1360,7 +1360,7 @@ func GetIpv4(address string) (string, error) {
 		return "", err
 	}
 
-	exist, ip, _ := hosts.HostAddressLookup(address, txeh.IPFamilyV4)
+	exist, ip, _ := hosts.HostAddressLookup(address /*, txeh.IPFamilyV4*/)
 	if exist {
 		return ip, nil
 	}
@@ -1389,7 +1389,7 @@ func IsLocal(hostname string) bool {
 		return false
 	}
 
-	exist, ip, _ := hosts.HostAddressLookup(hostname, txeh.IPFamilyV4)
+	exist, ip, _ := hosts.HostAddressLookup(hostname /*, txeh.IPFamilyV4*/)
 	if exist {
 		isLocal := privateIPCheck(ip)
 		return isLocal
